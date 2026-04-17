@@ -891,7 +891,7 @@ class SettingsActivity : AppCompatActivity() {
         val message = """
             课表
 
-            版本: 1.6.0
+            版本: 1.6.1
 
             功能: 自行摸索
 

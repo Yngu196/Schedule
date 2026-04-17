@@ -412,7 +412,7 @@
                     android:id="@+id/btn_check_update"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="手动更新"
+                    android:text="检测更新"
                     android:textSize="15sp"
                     android:textColor="@android:color/white"
                     android:padding="12dp"

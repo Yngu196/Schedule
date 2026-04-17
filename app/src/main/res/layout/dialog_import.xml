@@ -64,41 +64,11 @@
             android:background="#E0E0E0" />
 
         <TextView
-            android:id="@+id/btn_import_html"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:gravity="center"
-            android:text="从 Html 文件导入"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="16sp"
-            android:background="?attr/selectableItemBackground" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#E0E0E0" />
-
-        <TextView
             android:id="@+id/btn_import_file"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:gravity="center"
             android:text="从分享/导出文件导入"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="16sp"
-            android:background="?attr/selectableItemBackground" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#E0E0E0" />
-
-        <TextView
-            android:id="@+id/btn_import_code"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:gravity="center"
-            android:text="从分享口令导入"
             android:textColor="?attr/colorPrimary"
             android:textSize="16sp"
             android:background="?attr/selectableItemBackground" />

@@ -1,6 +1,8 @@
 package com.cherry.wakeupschedule
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -472,22 +474,12 @@ class MainActivity : AppCompatActivity() {
             dialog.dismiss()
         }
 
-        dialogView.findViewById<TextView>(R.id.btn_import_html).setOnClickListener {
-            Toast.makeText(this, "Html导入功能开发中", Toast.LENGTH_SHORT).show()
-            dialog.dismiss()
-        }
-
         dialogView.findViewById<TextView>(R.id.btn_import_file).setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                 type = "*/*"
                 addCategory(Intent.CATEGORY_OPENABLE)
             }
             startActivityForResult(intent, REQUEST_CODE_IMPORT_FILE)
-            dialog.dismiss()
-        }
-
-        dialogView.findViewById<TextView>(R.id.btn_import_code).setOnClickListener {
-            Toast.makeText(this, "口令导入功能开发中", Toast.LENGTH_SHORT).show()
             dialog.dismiss()
         }
 
@@ -529,12 +521,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun shareApp() {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Schedule课程表")
-            putExtra(Intent.EXTRA_TEXT, "推荐一个好用的课程表App：Schedule课程表\n下载链接：https://wwbph.lanzoul.com/b019vqfy9c\n密码:666")
-        }
-        startActivity(Intent.createChooser(intent, "分享"))
+        val githubUrl = "https://github.com/Yngu196/Schedule"
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("GitHub链接", githubUrl)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(this, "已复制 GitHub 链接", Toast.LENGTH_SHORT).show()
     }
 
     private fun exportBackup() {
