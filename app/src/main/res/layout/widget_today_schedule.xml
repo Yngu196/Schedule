@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_widget_white"
+    android:padding="10dp">
+
+    <!-- 标题栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:id="@+id/tv_widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="本学期"
+            android:textSize="11sp"
+            android:textColor="#666666" />
+
+        <TextView
+            android:id="@+id/tv_widget_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="今日"
+            android:textSize="12sp"
+            android:textColor="#4A90E2"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_widget_week"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="10sp"
+            android:textColor="#888888"
+            android:layout_marginStart="6dp" />
+    </LinearLayout>
+
+    <!-- 课程列表 -->
+    <LinearLayout
+        android:id="@+id/ll_courses_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- 课程项 1 -->
+        <LinearLayout
+            android:id="@+id/course_item_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingVertical="3dp">
+
+            <ImageView
+                android:id="@+id/course_indicator_1"
+                android:layout_width="3dp"
+                android:layout_height="match_parent"
+                android:background="#E57373"
+                android:layout_marginEnd="6dp"
+                android:contentDescription="课程指示器" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_course_name_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="暂无课程"
+                    android:textSize="13sp"
+                    android:textColor="#333333"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/tv_course_location_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="点击添加课程"
+                    android:textSize="10sp"
+                    android:textColor="#888888"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/tv_course_time_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="10sp"
+                    android:textColor="#AAAAAA" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 课程项 2 -->
+        <LinearLayout
+            android:id="@+id/course_item_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingVertical="3dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/course_indicator_2"
+                android:layout_width="3dp"
+                android:layout_height="match_parent"
+                android:background="#FF8A65"
+                android:layout_marginEnd="6dp"
+                android:contentDescription="课程指示器" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_course_name_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="13sp"
+                    android:textColor="#333333"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/tv_course_location_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="10sp"
+                    android:textColor="#888888"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/tv_course_time_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="10sp"
+                    android:textColor="#AAAAAA" />
+            </LinearLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- 底部信息 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="2dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="今日课程"
+            android:textSize="10sp"
+            android:textColor="#999999" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="2 x 2"
+            android:textSize="10sp"
+            android:textColor="#CCCCCC" />
+    </LinearLayout>
+
+</LinearLayout>

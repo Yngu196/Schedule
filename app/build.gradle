@@ -1,0 +1,136 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+
+
+android {
+    namespace 'com.cherry.wakeupschedule'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.cherry.wakeupschedule"
+        minSdk 26
+        targetSdk 33
+        versionCode 1460
+        versionName "1.6.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    applicationVariants.all {
+        variant ->
+            variant.outputs.each {
+                output ->
+                    output.outputFileName = "Schedule-app-${variant.buildType.name}-${defaultConfig.versionName}.apk"
+            }
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("wakeup-schedule-key.jks")
+            storePassword "WakeUp2024"
+            keyAlias "wakeup_schedule"
+            keyPassword "WakeUp2024"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
+    
+    packagingOptions {
+        exclude 'META-INF/INDEX.LIST'
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/groovy-release-info.properties'
+        exclude 'META-INF/groovy/**'
+        exclude 'META-INF/groovy-dateutil/**'
+        exclude 'META-INF/LICENSE.md'
+        exclude 'META-INF/NOTICE.md'
+        pickFirst 'META-INF/groovy-release-info.properties'
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
+    kotlinOptions {
+        jvmTarget = '17'
+        freeCompilerArgs += ["-Xjvm-default=all"]
+    }
+    
+    buildFeatures {
+        viewBinding true
+    }
+    
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // Lifecycle
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.1'
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.6.1'
+
+    // Navigation
+    implementation 'androidx.navigation:navigation-fragment-ktx:2.6.0'
+    implementation 'androidx.navigation:navigation-ui-ktx:2.6.0'
+
+    // ViewPager2 for swipe gestures
+    implementation 'androidx.viewpager2:viewpager2:1.0.0'
+
+    // WorkManager for background scheduling
+    implementation 'androidx.work:work-runtime-ktx:2.8.1'
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'
+    
+    // Excel文件解析
+    implementation 'org.apache.poi:poi:5.2.3'
+    implementation 'org.apache.poi:poi-ooxml:5.2.3'
+    implementation 'org.apache.poi:poi-scratchpad:5.2.3'
+    
+    // Network
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+    
+    // Image loading
+    implementation 'com.github.bumptech.glide:glide:4.14.2'
+    
+    // Calendar
+    implementation 'org.mnode.ical4j:ical4j:3.2.9'
+    
+    // JavaMail API for sending emails
+    implementation 'com.sun.mail:android-mail:1.6.7'
+    implementation 'com.sun.mail:android-activation:1.6.7'
+    
+    // File picker
+    // implementation 'com.github.nbsp:materialfilepicker:1.0'
+    
+    // Toasty for better toast messages
+    // implementation 'com.github.GrenderG:Toasty:1.5.2'
+    
+    // Room database (commented out due to compilation issues)
+    // implementation "androidx.room:room-runtime:2.5.2"
+    // implementation "androidx.room:room-ktx:2.5.2"
+    // annotationProcessor "androidx.room:room-compiler:2.5.2"
+    
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
