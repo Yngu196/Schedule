@@ -23,12 +23,10 @@
 ### 新增功能
 
 - 下节课倒计时显示
-- 下一节课高亮显示
 - 极简桌面小组件（显示下节课及倒计时）
 - 权限设置引导
 - 新手引导教程
 - 日/周视图切换
-- 学期自动识别
 
 ## 技术栈
 
@@ -77,8 +75,6 @@ app/src/main/
 ## License
 
 ```
-Copyright 2024 Trae+魔改重构
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
