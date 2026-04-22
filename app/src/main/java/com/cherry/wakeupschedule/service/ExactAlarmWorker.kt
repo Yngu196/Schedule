@@ -90,6 +90,7 @@ class ExactAlarmWorker(
 
     private fun shouldReschedule(course: Course): Boolean {
         val currentWeek = getCurrentWeek()
+        // 只在本学期周范围内且未超过结束周时重新调度
         return currentWeek in course.startWeek..course.endWeek
     }
 

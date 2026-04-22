@@ -46,6 +46,7 @@
         <activity android:name=".PermissionGuideActivity" />
         <activity android:name=".IntroActivity" />
         <activity android:name=".AboutActivity" />
+        <activity android:name=".CourseOverviewActivity" />
 
         <!-- 闹钟接收器 -->
         <receiver
@@ -80,7 +81,7 @@
         <receiver
             android:name=".widget.MinimalWidgetProvider"
             android:exported="true"
-            android:label="下节课倒计时">
+            android:label="下课倒计时">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.appwidget.action.APPWIDGET_ENABLED" />
@@ -90,6 +91,22 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_minimal_info" />
+        </receiver>
+
+        <!-- 桌面小部件 - 本周课程 -->
+        <receiver
+            android:name=".widget.WeekCoursesWidgetProvider"
+            android:exported="true"
+            android:label="本周课程">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.appwidget.action.APPWIDGET_ENABLED" />
+                <action android:name="android.appwidget.action.APPWIDGET_DISABLED" />
+                <action android:name="com.cherry.wakeupschedule.widget.week.ACTION_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_week_info" />
         </receiver>
 
         <!-- 小组件定时更新接收器 -->
@@ -105,6 +122,21 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- 课程结束更新小组件接收器 -->
+        <receiver
+            android:name=".widget.WidgetCourseEndReceiver"
+            android:exported="false" />
+
+        <!-- 小组件定期更新接收器 -->
+        <receiver
+            android:name=".widget.WidgetPeriodicUpdateReceiver"
+            android:exported="false" />
+
+        <!-- 本周课程小组件定期更新接收器 -->
+        <receiver
+            android:name=".widget.WeekWidgetPeriodicReceiver"
+            android:exported="false" />
 
         <!-- 课程提醒前台服务 -->
         <service

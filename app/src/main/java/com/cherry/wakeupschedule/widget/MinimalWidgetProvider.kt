@@ -101,11 +101,6 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 isCourseInCurrentWeekType(course, currentWeek)
             }.sortedBy { course -> getCourseStartMinutes(context, course) }
 
-            val nextCourse = todayCourses.find { course ->
-                val startMinutes = getCourseStartMinutes(context, course)
-                startMinutes > currentTime
-            }
-
             val currentCourse = todayCourses.find { course ->
                 val startMinutes = getCourseStartMinutes(context, course)
                 val endMinutes = getCourseEndMinutes(context, course)
@@ -114,36 +109,22 @@ class MinimalWidgetProvider : AppWidgetProvider() {
 
             when {
                 currentCourse != null -> {
-                    views.setTextViewText(R.id.tv_widget_title, "正在上课")
+                    views.setTextViewText(R.id.tv_widget_title, "下课倒计时")
                     views.setTextViewText(R.id.tv_course_name, currentCourse.name)
                     val endMinutes = getCourseEndMinutes(context, currentCourse)
                     val remainingMinutes = endMinutes - currentTime
                     views.setTextViewText(R.id.tv_countdown, "${remainingMinutes}分钟")
                     views.setTextViewText(R.id.tv_course_time, "后下课")
                 }
-                nextCourse != null -> {
-                    views.setTextViewText(R.id.tv_widget_title, "下节课")
-                    views.setTextViewText(R.id.tv_course_name, nextCourse.name)
-                    val startMinutes = getCourseStartMinutes(context, nextCourse)
-                    val remainingMinutes = startMinutes - currentTime
-                    views.setTextViewText(R.id.tv_countdown, "${remainingMinutes}分钟")
-                    views.setTextViewText(R.id.tv_course_time, "后开始")
-                }
-                todayCourses.isNotEmpty() -> {
-                    views.setTextViewText(R.id.tv_widget_title, "今日课程")
-                    views.setTextViewText(R.id.tv_course_name, "已全部结束")
-                    views.setTextViewText(R.id.tv_countdown, "✓")
-                    views.setTextViewText(R.id.tv_course_time, "好好休息")
-                }
                 else -> {
-                    views.setTextViewText(R.id.tv_widget_title, "今日课程")
-                    views.setTextViewText(R.id.tv_course_name, "暂无课程")
+                    views.setTextViewText(R.id.tv_widget_title, "下课倒计时")
+                    views.setTextViewText(R.id.tv_course_name, "当前没课")
                     views.setTextViewText(R.id.tv_countdown, "--")
                     views.setTextViewText(R.id.tv_course_time, "")
                 }
             }
         } catch (e: Exception) {
-            views.setTextViewText(R.id.tv_widget_title, "课程表")
+            views.setTextViewText(R.id.tv_widget_title, "下课倒计时")
             views.setTextViewText(R.id.tv_course_name, "加载失败")
             views.setTextViewText(R.id.tv_countdown, "--")
             views.setTextViewText(R.id.tv_course_time, "")

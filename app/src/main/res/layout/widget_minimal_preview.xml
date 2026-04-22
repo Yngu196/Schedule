@@ -3,12 +3,42 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:background="@android:color/white"
+    android:padding="8dp"
     android:gravity="center">
 
-    <ImageView
+    <TextView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="fitCenter"
-        android:src="@drawable/intro_widget_minimal" />
+        android:layout_height="wrap_content"
+        android:text="下课倒计时"
+        android:textSize="10sp"
+        android:textColor="#888888"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="高等数学"
+        android:textSize="14sp"
+        android:textColor="#333333"
+        android:textStyle="bold"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="35"
+        android:textSize="24sp"
+        android:textColor="#4A90E2"
+        android:textStyle="bold"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="分钟后下课"
+        android:textSize="10sp"
+        android:textColor="#666666"
+        android:gravity="center" />
 
 </LinearLayout>

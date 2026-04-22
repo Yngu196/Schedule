@@ -73,12 +73,51 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     // 图片选择器 - 用于选择背景图片
+    private var pendingBackgroundUri: Uri? = null
+
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { selectedUri ->
-            saveBackgroundImage(selectedUri)
+            pendingBackgroundUri = selectedUri
+            cropImage(selectedUri)
         }
+    }
+
+    private fun cropImage(uri: Uri) {
+        try {
+            val cropIntent = Intent("com.android.camera.action.CROP").apply {
+                setDataAndType(uri, "image/*")
+                putExtra("crop", "true")
+                putExtra("aspectX", 0)
+                putExtra("aspectY", 0)
+                putExtra("outputX", 1080)
+                putExtra("outputY", 1920)
+                putExtra("scale", true)
+                putExtra("return-data", false)
+                val outputUri = Uri.fromFile(File(cacheDir, "cropped_bg_${System.currentTimeMillis()}.jpg"))
+                putExtra(MediaStore.EXTRA_OUTPUT, outputUri)
+                putExtra("outputFormat", Bitmap.CompressFormat.JPEG.name)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            cropImageLauncher.launch(cropIntent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "无法裁剪图片，将使用原图", Toast.LENGTH_SHORT).show()
+            saveBackgroundImage(uri)
+        }
+    }
+
+    private val cropImageLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val outputUri = result.data?.data ?: pendingBackgroundUri
+            outputUri?.let { saveBackgroundImage(it) }
+        } else {
+            pendingBackgroundUri?.let { saveBackgroundImage(it) }
+        }
+        pendingBackgroundUri = null
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -656,7 +695,7 @@ class SettingsActivity : AppCompatActivity() {
     }
     
     private fun showBackgroundDialog() {
-        val backgrounds = arrayOf("默认背景", "从相册选择图片", "磨砂背景")
+        val backgrounds = arrayOf("默认背景", "从相册选择图片(可裁剪)", "纯色背景")
 
         AlertDialog.Builder(this)
             .setTitle("选择应用背景")

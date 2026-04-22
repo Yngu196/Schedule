@@ -350,7 +350,10 @@ class ImportService(private val context: Context) {
         try {
             Regex("""(\d+)-(\d)(\d)(\d)(\d)""").find(weekRangeStr)?.let {
                 val week = it.groupValues[1].toInt()
-                return Quadruple(week, week, it.groupValues[2].toInt() * 10 + it.groupValues[3].toInt(), it.groupValues[4].toInt() * 10 + it.groupValues[5].toInt() + 1)
+                // 正确解析：如"1-0102"表示第1周的第1-2节
+                val startTime = (it.groupValues[2] + it.groupValues[3]).toInt()
+                val endTime = (it.groupValues[4] + it.groupValues[5]).toInt()
+                return Quadruple(week, week, startTime, endTime)
             }
             Regex("""(\d+)-(\d+)周""").find(weekRangeStr)?.let {
                 return Quadruple(it.groupValues[1].toInt(), it.groupValues[2].toInt(), defaultTimeSlot, defaultTimeSlot + 1)

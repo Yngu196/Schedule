@@ -104,3 +104,17 @@ class WidgetCourseEndReceiver : BroadcastReceiver() {
         }
     }
 }
+
+class WidgetPeriodicUpdateReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        context?.let {
+            ScheduleWidgetProvider().onUpdate(
+                it,
+                AppWidgetManager.getInstance(it),
+                AppWidgetManager.getInstance(it).getAppWidgetIds(
+                    ComponentName(it, ScheduleWidgetProvider::class.java)
+                )
+            )
+        }
+    }
+}

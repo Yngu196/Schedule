@@ -27,6 +27,8 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
     companion object {
         const val ACTION_REFRESH = "com.cherry.wakeupschedule.widget.ACTION_REFRESH"
         private const val WIDGET_COURSE_END_REQUEST_CODE = 10002
+        private const val WIDGET_PERIODIC_UPDATE_REQUEST_CODE = 10003
+        private const val PERIODIC_UPDATE_INTERVAL = 15 * 60 * 1000L // 15分钟
         private val courseColors = intArrayOf(
             Color.parseColor("#E57373"), Color.parseColor("#F06292"), Color.parseColor("#BA68C8"),
             Color.parseColor("#9575CD"), Color.parseColor("#7986CB"), Color.parseColor("#64B5F6"),
@@ -37,14 +39,41 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (appWidgetId in appWidgetIds) updateAppWidget(context, appWidgetManager, appWidgetId)
-        scheduleNextCourseEndUpdate(context)  // 调度下次课程结束时更新
+        scheduleNextCourseEndUpdate(context)
+        schedulePeriodicUpdate(context)
     }
 
-    override fun onEnabled(context: Context) { super.onEnabled(context); updateAllWidgets(context) }
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        updateAllWidgets(context)
+        schedulePeriodicUpdate(context)
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_REFRESH) updateAllWidgets(context)
+        when (intent.action) {
+            ACTION_REFRESH -> updateAllWidgets(context)
+            "com.cherry.wakeupschedule.widget.ACTION_PERIODIC_UPDATE" -> updateAllWidgets(context)
+        }
+    }
+
+    // 定期更新小组件
+    private fun schedulePeriodicUpdate(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, WidgetPeriodicUpdateReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_PERIODIC_UPDATE_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + PERIODIC_UPDATE_INTERVAL, pendingIntent)
+            } else {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + PERIODIC_UPDATE_INTERVAL, pendingIntent)
+            }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
     // 更新所有小组件

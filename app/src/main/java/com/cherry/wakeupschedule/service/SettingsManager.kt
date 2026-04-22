@@ -61,7 +61,23 @@ class SettingsManager(context: Context) {
      * @return 当前学期字符串，如"2024-2025学年 第一学期"
      */
     fun getCurrentSemester(): String {
-        return sharedPreferences.getString(KEY_CURRENT_SEMESTER, DEFAULT_SEMESTER) ?: DEFAULT_SEMESTER
+        return sharedPreferences.getString(KEY_CURRENT_SEMESTER, getAutoDetectedSemester()) ?: getAutoDetectedSemester()
+    }
+
+    /**
+     * 自动检测当前学期
+     * 根据当前日期自动推断学期
+     * @return 自动检测的学期名称
+     */
+    fun getAutoDetectedSemester(): String {
+        val calendar = Calendar.getInstance()
+        val year = calendar.get(Calendar.YEAR)
+        val month = calendar.get(Calendar.MONTH) + 1
+        return when {
+            month in 1..6 -> "${year - 1}-${year}学年 第二学期"
+            month in 7..8 -> "${year - 1}-${year}学年 第二学期" // 暑假期间仍显示上学期
+            else -> "${year}-${year + 1}学年 第一学期"
+        }
     }
 
     /**

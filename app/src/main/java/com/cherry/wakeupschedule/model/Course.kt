@@ -15,6 +15,6 @@ data class Course(
     val weekType: Int = 0, // 0: 每周, 1: 单周, 2: 双周
     val alarmEnabled: Boolean = true,
     val alarmMinutesBefore: Int = 15, // 提前多少分钟提醒
-    val color: Int = 0xFF6200EE.toInt(), // 课程颜色
+    val color: Int = 0, // 课程颜色，0表示使用默认颜色
     val coverImagePath: String = "" // 课程封面图片路径
 ) : Serializable

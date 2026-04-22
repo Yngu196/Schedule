@@ -3,6 +3,7 @@ package com.cherry.wakeupschedule
 import android.app.Application
 import android.util.Log
 import com.cherry.wakeupschedule.service.AlarmService
+import com.cherry.wakeupschedule.service.CourseDataManager
 import com.cherry.wakeupschedule.service.CourseReminderWorker
 import com.cherry.wakeupschedule.service.NotificationHelper
 import com.cherry.wakeupschedule.service.SettingsManager
@@ -27,6 +28,14 @@ class App : Application() {
             android.util.Log.d("App", "Notification channels created")
         } catch (e: Exception) {
             android.util.Log.e("App", "Failed to create notification channels", e)
+        }
+
+        try {
+            // 初始化课程数据管理器（确保Widget可以访问）
+            CourseDataManager.getInstance(this)
+            android.util.Log.d("App", "CourseDataManager initialized successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("App", "Failed to initialize CourseDataManager", e)
         }
 
         try {

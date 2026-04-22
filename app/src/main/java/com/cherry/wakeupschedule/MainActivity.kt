@@ -54,24 +54,18 @@ class MainActivity : AppCompatActivity() {
     private val dateFormat = SimpleDateFormat("yyyy/M/d", Locale.getDefault())
     private val weekFormat = SimpleDateFormat("EEE", Locale.getDefault())
 
+    private val timeAxisViews = mutableListOf<LinearLayout>()
+
     // 课程颜色数组
     private val courseColors = intArrayOf(
-        Color.parseColor("#E57373"), // 红色
-        Color.parseColor("#F06292"), // 粉色
-        Color.parseColor("#BA68C8"), // 紫色
-        Color.parseColor("#9575CD"), // 深紫
-        Color.parseColor("#7986CB"), // 靛蓝
-        Color.parseColor("#64B5F6"), // 蓝色
-        Color.parseColor("#4FC3F7"), // 浅蓝
-        Color.parseColor("#4DD0E1"), // 青色
-        Color.parseColor("#4DB6AC"), // 蓝绿
-        Color.parseColor("#81C784"), // 绿色
-        Color.parseColor("#AED581"), // 浅绿
-        Color.parseColor("#DCE775"), // 黄绿
-        Color.parseColor("#FFF176"), // 黄色
-        Color.parseColor("#FFD54F"), // 琥珀
-        Color.parseColor("#FFB74D"), // 橙色
-        Color.parseColor("#FF8A65")  // 深橙
+        Color.parseColor("#E53935"), Color.parseColor("#1E88E5"), Color.parseColor("#43A047"),
+        Color.parseColor("#FDD835"), Color.parseColor("#F4511E"), Color.parseColor("#8E24AA"),
+        Color.parseColor("#D81B60"), Color.parseColor("#00ACC1"), Color.parseColor("#FFB300"),
+        Color.parseColor("#5E35B1"), Color.parseColor("#3949AB"), Color.parseColor("#039BE5"),
+        Color.parseColor("#7CB342"), Color.parseColor("#C0CA33"), Color.parseColor("#FB8C00"),
+        Color.parseColor("#AB47BC"), Color.parseColor("#E91E63"), Color.parseColor("#00897B"),
+        Color.parseColor("#5C6BC0"), Color.parseColor("#26A69A"), Color.parseColor("#66BB6A"),
+        Color.parseColor("#6D4C41"), Color.parseColor("#757575"), Color.parseColor("#546E7A")
     )
 
     // 存储所有课程，用于检测冲突
@@ -113,7 +107,9 @@ class MainActivity : AppCompatActivity() {
         setupObservers()
         setupSwipeGesture()
         updateDateDisplay()
+        // generateTimeAxis必须在applyBackgroundSettings之前执行，以便timeAxisViews被正确填充
         generateTimeAxis()
+        applyBackgroundSettings()
 
         // 自动检查更新（不影响课表查看，每天最多一次）
         UpdateService(this).checkForUpdateSilently()
@@ -384,22 +380,112 @@ class MainActivity : AppCompatActivity() {
                     try {
                         val bitmap = BitmapFactory.decodeFile(customBgPath)
                         binding.ivBackground.setImageBitmap(bitmap)
+                        binding.ivBackground.setBackgroundColor(Color.TRANSPARENT)
+                        setTextColorsForCustomBackground()
                     } catch (e: Exception) {
                         binding.ivBackground.setImageResource(R.drawable.home)
+                        binding.ivBackground.setBackgroundColor(Color.TRANSPARENT)
+                        setDefaultTextColors()
                     }
                 } else {
                     binding.ivBackground.setImageResource(R.drawable.home)
+                    binding.ivBackground.setBackgroundColor(Color.TRANSPARENT)
+                    setDefaultTextColors()
                 }
             }
             "solid" -> {
-                // 磨砂背景
-                binding.ivBackground.setImageResource(R.drawable.home)
+                // 纯色背景
+                binding.ivBackground.setImageResource(0)
+                val solidColor = settingsManager.getSolidBackgroundColor()
+                binding.ivBackground.setBackgroundColor(solidColor)
+                setTextColorsForSolidBackground(solidColor)
             }
             else -> {
                 // 默认背景
                 binding.ivBackground.setImageResource(R.drawable.home)
+                binding.ivBackground.setBackgroundColor(Color.TRANSPARENT)
+                setDefaultTextColors()
             }
         }
+    }
+
+    private fun setTextColorsForSolidBackground(bgColor: Int) {
+        val isLightBackground = isLightColor(bgColor)
+        val textColor = if (isLightBackground) Color.BLACK else Color.WHITE
+        val subTextColor = if (isLightBackground) Color.parseColor("#666666") else Color.parseColor("#CCCCCC")
+
+        binding.tvDate.setTextColor(textColor)
+        binding.tvWeekInfo.setTextColor(subTextColor)
+        binding.btnAdd.setColorFilter(textColor)
+        binding.btnImport.setColorFilter(textColor)
+        binding.btnExport.setColorFilter(textColor)
+        binding.btnMore.setColorFilter(textColor)
+
+        // 设置星期表头颜色
+        val weekdayViews = listOf(
+            binding.tvWeekday1, binding.tvWeekday2, binding.tvWeekday3,
+            binding.tvWeekday4, binding.tvWeekday5, binding.tvWeekday6, binding.tvWeekday7
+        )
+        weekdayViews.forEach { it.setTextColor(textColor) }
+
+        // 设置日期数字颜色
+        val dateViews = listOf(
+            binding.tvDate1, binding.tvDate2, binding.tvDate3,
+            binding.tvDate4, binding.tvDate5, binding.tvDate6, binding.tvDate7
+        )
+        dateViews.forEach { it.setTextColor(textColor) }
+
+        // 设置时间轴颜色
+        updateTimeAxisColors(textColor, subTextColor)
+    }
+
+    private fun updateTimeAxisColors(textColor: Int, subTextColor: Int) {
+        timeAxisViews.forEach { timeView ->
+            val tvNode = timeView.findViewById<TextView>(R.id.tv_node)
+            val tvStartTime = timeView.findViewById<TextView>(R.id.tv_start_time)
+            val tvEndTime = timeView.findViewById<TextView>(R.id.tv_end_time)
+            tvNode.setTextColor(textColor)
+            tvStartTime.setTextColor(subTextColor)
+            tvEndTime.setTextColor(subTextColor)
+        }
+    }
+
+    private fun setTextColorsForCustomBackground() {
+        setDefaultTextColors()
+    }
+
+    private fun setDefaultTextColors() {
+        val whiteColor = Color.WHITE
+        val whiteSubColor = Color.parseColor("#CCFFFFFF")
+
+        binding.tvDate.setTextColor(whiteColor)
+        binding.tvWeekInfo.setTextColor(whiteColor)
+        binding.btnAdd.setColorFilter(whiteColor)
+        binding.btnImport.setColorFilter(whiteColor)
+        binding.btnExport.setColorFilter(whiteColor)
+        binding.btnMore.setColorFilter(whiteColor)
+
+        // 设置星期表头颜色
+        val weekdayViews = listOf(
+            binding.tvWeekday1, binding.tvWeekday2, binding.tvWeekday3,
+            binding.tvWeekday4, binding.tvWeekday5, binding.tvWeekday6, binding.tvWeekday7
+        )
+        weekdayViews.forEach { it.setTextColor(whiteColor) }
+
+        // 设置日期数字颜色
+        val dateViews = listOf(
+            binding.tvDate1, binding.tvDate2, binding.tvDate3,
+            binding.tvDate4, binding.tvDate5, binding.tvDate6, binding.tvDate7
+        )
+        dateViews.forEach { it.setTextColor(whiteColor) }
+
+        // 设置时间轴颜色
+        updateTimeAxisColors(whiteColor, whiteSubColor)
+    }
+
+    private fun isLightColor(color: Int): Boolean {
+        val darkness = 1 - (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
+        return darkness < 0.5
     }
 
     private fun setupClickListeners() {
@@ -420,8 +506,7 @@ class MainActivity : AppCompatActivity() {
 
         // 更多按钮
         binding.btnMore.setOnClickListener {
-            val intent = Intent(this, SettingsActivity::class.java)
-            startActivity(intent)
+            showMoreOptionsDialog()
         }
 
         // 周次显示点击 - 快速跳转到当前周
@@ -576,8 +661,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupObservers() {
-        viewModel.courses.observe(this) { courses ->
-            allCourses = courses ?: emptyList()
+        viewModel.courses.observe(this) { _ ->
+            allCourses = CourseDataManager.getInstance(this).getAllCourses()
             if (allCourses.isEmpty()) {
                 binding.layoutEmpty.visibility = View.VISIBLE
                 binding.courseGrid.visibility = View.GONE
@@ -616,10 +701,11 @@ class MainActivity : AppCompatActivity() {
     private fun generateTimeAxis() {
         val timeAxis = binding.timeAxis
         timeAxis.removeAllViews()
+        timeAxisViews.clear()
 
         val timeTableManager = TimeTableManager.getInstance(this)
         val maxNodes = timeTableManager.getMaxNodes()
-        
+
         // 获取课程单元格的高度
         val cellHeight = resources.getDimensionPixelSize(R.dimen.course_cell_height)
 
@@ -628,7 +714,7 @@ class MainActivity : AppCompatActivity() {
             // 尝试获取自定义时间槽，否则使用默认值
             val timeSlot = timeTableManager.getTimeSlots().find { it.node == node }
                 ?: TimeTableManager.getTimeSlot(node) ?: TimeTableManager.TimeSlot(node, "08:00", "08:45")
-            
+
             val timeView = LayoutInflater.from(this)
                 .inflate(R.layout.item_time_slot, timeAxis, false) as LinearLayout
 
@@ -648,6 +734,7 @@ class MainActivity : AppCompatActivity() {
             tvEndTime.text = if (endTime.contains(":")) endTime else "00:00"
 
             timeAxis.addView(timeView)
+            timeAxisViews.add(timeView)
         }
     }
     
@@ -740,7 +827,7 @@ class MainActivity : AppCompatActivity() {
 
             // 添加课程卡片
             validCourses.forEachIndexed { index, course ->
-                val color = courseColors[index % courseColors.size]
+                val color = if (course.color != 0) course.color else courseColors[index % courseColors.size]
                 val key = Pair(course.dayOfWeek - 1, course.startTime - 1)
                 val conflictCourses = courseGroups[key] ?: listOf()
                 val hasConflict = conflictCourses.size > 1
@@ -956,6 +1043,25 @@ class MainActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
+    private fun showMoreOptionsDialog() {
+        val options = arrayOf("课程全览", "设置")
+        AlertDialog.Builder(this)
+            .setTitle("更多选项")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        val intent = Intent(this, CourseOverviewActivity::class.java)
+                        startActivity(intent)
+                    }
+                    1 -> {
+                        val intent = Intent(this, SettingsActivity::class.java)
+                        startActivity(intent)
+                    }
+                }
+            }
+            .show()
+    }
+
     private fun showDeleteDialog(course: Course) {
         AlertDialog.Builder(this)
             .setTitle("删除课程")
@@ -1003,10 +1109,11 @@ class MainActivity : AppCompatActivity() {
         settingsManager.setDefaultWeek(currentWeek)
         // 同步显示周与当前周
         displayWeek = currentWeek
+        // generateTimeAxis必须在applyBackgroundSettings之前执行
+        generateTimeAxis()
         // 重新应用背景设置
         applyBackgroundSettings()
         updateWeekDisplay()
-        generateTimeAxis()
         viewModel.loadCoursesForWeek(displayWeek)
         // 如果已经有课程数据，重新显示以适配新的时间轴
         allCourses.let {
