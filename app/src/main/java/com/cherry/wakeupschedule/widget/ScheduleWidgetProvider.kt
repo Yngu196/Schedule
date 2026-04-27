@@ -35,6 +35,13 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
             Color.parseColor("#4FC3F7"), Color.parseColor("#4DD0E1"), Color.parseColor("#4DB6AC"),
             Color.parseColor("#81C784"), Color.parseColor("#FFB74D"), Color.parseColor("#FF8A65")
         )
+
+        fun triggerUpdate(context: Context) {
+            val intent = Intent(context, ScheduleWidgetProvider::class.java).apply {
+                action = ACTION_REFRESH
+            }
+            context.sendBroadcast(intent)
+        }
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -47,6 +54,16 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
         super.onEnabled(context)
         updateAllWidgets(context)
         schedulePeriodicUpdate(context)
+        WidgetMidnightReceiver.scheduleMidnightUpdate(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        try {
+            cancelPeriodicUpdate(context)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -58,7 +75,7 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
     }
 
     // 定期更新小组件
-    private fun schedulePeriodicUpdate(context: Context) {
+    fun schedulePeriodicUpdate(context: Context) {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, WidgetPeriodicUpdateReceiver::class.java)
@@ -74,6 +91,22 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + PERIODIC_UPDATE_INTERVAL, pendingIntent)
             }
         } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    private fun cancelPeriodicUpdate(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, WidgetPeriodicUpdateReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_PERIODIC_UPDATE_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // 更新所有小组件

@@ -101,6 +101,13 @@ class WidgetCourseEndReceiver : BroadcastReceiver() {
                     ComponentName(it, ScheduleWidgetProvider::class.java)
                 )
             )
+            MinimalWidgetProvider().onUpdate(
+                it,
+                AppWidgetManager.getInstance(it),
+                AppWidgetManager.getInstance(it).getAppWidgetIds(
+                    ComponentName(it, MinimalWidgetProvider::class.java)
+                )
+            )
         }
     }
 }
@@ -115,6 +122,22 @@ class WidgetPeriodicUpdateReceiver : BroadcastReceiver() {
                     ComponentName(it, ScheduleWidgetProvider::class.java)
                 )
             )
+            ScheduleWidgetProvider().schedulePeriodicUpdate(it)
+        }
+    }
+}
+
+class MinimalWidgetPeriodicReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        context?.let {
+            MinimalWidgetProvider().onUpdate(
+                it,
+                AppWidgetManager.getInstance(it),
+                AppWidgetManager.getInstance(it).getAppWidgetIds(
+                    ComponentName(it, MinimalWidgetProvider::class.java)
+                )
+            )
+            MinimalWidgetProvider().schedulePeriodicUpdate(it)
         }
     }
 }

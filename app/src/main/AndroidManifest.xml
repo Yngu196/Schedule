@@ -93,22 +93,6 @@
                 android:resource="@xml/widget_minimal_info" />
         </receiver>
 
-        <!-- 桌面小部件 - 本周课程 -->
-        <receiver
-            android:name=".widget.WeekCoursesWidgetProvider"
-            android:exported="true"
-            android:label="本周课程">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="android.appwidget.action.APPWIDGET_ENABLED" />
-                <action android:name="android.appwidget.action.APPWIDGET_DISABLED" />
-                <action android:name="com.cherry.wakeupschedule.widget.week.ACTION_REFRESH" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_week_info" />
-        </receiver>
-
         <!-- 小组件定时更新接收器 -->
         <receiver
             android:name=".widget.WidgetUpdateReceiver"
@@ -133,9 +117,25 @@
             android:name=".widget.WidgetPeriodicUpdateReceiver"
             android:exported="false" />
 
-        <!-- 本周课程小组件定期更新接收器 -->
+        <!-- Minimal小组件定期更新接收器 -->
         <receiver
-            android:name=".widget.WeekWidgetPeriodicReceiver"
+            android:name=".widget.MinimalWidgetPeriodicReceiver"
+            android:exported="false" />
+
+        <!-- 时间变化监听接收器 -->
+        <receiver
+            android:name=".widget.WidgetTimeChangedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_TICK" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 午夜更新接收器 -->
+        <receiver
+            android:name=".widget.WidgetMidnightReceiver"
             android:exported="false" />
 
         <!-- 课程提醒前台服务 -->

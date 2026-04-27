@@ -1,11 +1,13 @@
 package com.cherry.wakeupschedule.widget
 
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.widget.RemoteViews
 import com.cherry.wakeupschedule.MainActivity
 import com.cherry.wakeupschedule.R
@@ -18,6 +20,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val ACTION_REFRESH = "com.cherry.wakeupschedule.widget.minimal.ACTION_REFRESH"
+        private const val WIDGET_MINIMAL_PERIODIC_REQUEST_CODE = 10004
+        private const val WIDGET_MINIMAL_COURSE_END_REQUEST_CODE = 10006
+        private const val MINIMAL_PERIODIC_UPDATE_INTERVAL = 15 * 60 * 1000L
 
         fun triggerUpdate(context: Context) {
             val intent = Intent(context, MinimalWidgetProvider::class.java).apply {
@@ -35,17 +40,111 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         for (appWidgetId in appWidgetIds) {
             updateAppWidget(context, appWidgetManager, appWidgetId)
         }
+        schedulePeriodicUpdate(context)
+        scheduleNextCourseEndUpdate(context)
     }
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         updateAllWidgets(context)
+        schedulePeriodicUpdate(context)
+        WidgetMidnightReceiver.scheduleMidnightUpdate(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        try {
+            cancelPeriodicUpdate(context)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_REFRESH) {
-            updateAllWidgets(context)
+        when (intent.action) {
+            ACTION_REFRESH -> updateAllWidgets(context)
+            "com.cherry.wakeupschedule.widget.ACTION_PERIODIC_UPDATE" -> updateAllWidgets(context)
+        }
+    }
+
+    fun schedulePeriodicUpdate(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, MinimalWidgetPeriodicReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_MINIMAL_PERIODIC_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + MINIMAL_PERIODIC_UPDATE_INTERVAL, pendingIntent)
+            } else {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + MINIMAL_PERIODIC_UPDATE_INTERVAL, pendingIntent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun cancelPeriodicUpdate(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, MinimalWidgetPeriodicReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_MINIMAL_PERIODIC_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun scheduleNextCourseEndUpdate(context: Context) {
+        try {
+            val calendar = Calendar.getInstance()
+            val dayOfWeek = if (calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) 7 else calendar.get(Calendar.DAY_OF_WEEK) - 1
+            val currentTime = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+            val currentWeek = calculateCurrentWeek(SettingsManager(context))
+
+            val todayEndCourses = CourseDataManager.getInstance(context).getAllCourses()
+                .filter { it.dayOfWeek == dayOfWeek && currentWeek in it.startWeek..it.endWeek && isCourseInCurrentWeekType(it, currentWeek) }
+                .mapNotNull { val end = getCourseEndMinutes(context, it); if (end > currentTime) end to it else null }
+                .sortedBy { it.first }
+
+            if (todayEndCourses.isEmpty()) return
+            val delayMillis = (todayEndCourses[0].first - currentTime) * 60 * 1000L
+            if (delayMillis <= 0) {
+                triggerWidgetUpdate(context)
+                return
+            }
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_MINIMAL_COURSE_END_REQUEST_CODE,
+                Intent(context, WidgetCourseEndReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
+            } else {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun triggerWidgetUpdate(context: Context) {
+        val appWidgetManager = AppWidgetManager.getInstance(context)
+        val appWidgetIds = appWidgetManager.getAppWidgetIds(ComponentName(context, MinimalWidgetProvider::class.java))
+        if (appWidgetIds.isNotEmpty()) {
+            onUpdate(context, appWidgetManager, appWidgetIds)
         }
     }
 
