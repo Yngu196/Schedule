@@ -96,7 +96,12 @@ class SettingsActivity : AppCompatActivity() {
                 putExtra("outputY", 1920)
                 putExtra("scale", true)
                 putExtra("return-data", false)
-                val outputUri = Uri.fromFile(File(cacheDir, "cropped_bg_${System.currentTimeMillis()}.jpg"))
+                val outputFile = File(cacheDir, "cropped_bg_${System.currentTimeMillis()}.jpg")
+                val outputUri = androidx.core.content.FileProvider.getUriForFile(
+                    this@SettingsActivity,
+                    "${packageName}.fileprovider",
+                    outputFile
+                )
                 putExtra(MediaStore.EXTRA_OUTPUT, outputUri)
                 putExtra("outputFormat", Bitmap.CompressFormat.JPEG.name)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -971,11 +976,11 @@ class SettingsActivity : AppCompatActivity() {
     private fun applyAlarmSettings() {
         val alarmEnabled = settingsManager.isAlarmEnabled()
         try {
-            val alarmService = com.cherry.wakeupschedule.App.instance.alarmService
+            val app = com.cherry.wakeupschedule.App.instance
             if (alarmEnabled) {
-                alarmService?.scheduleAllReminders()
+                app.registerAllCourseNotifications()
             } else {
-                alarmService?.cancelAllReminders()
+                app.alarmService?.cancelAllReminders()
             }
         } catch (e: Exception) {
             android.util.Log.e("SettingsActivity", "Failed to apply alarm settings", e)

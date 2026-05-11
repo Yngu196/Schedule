@@ -32,9 +32,9 @@ android {
     signingConfigs {
         release {
             storeFile file("wakeup-schedule-key.jks")
-            storePassword "WakeUp2024"
-            keyAlias "wakeup_schedule"
-            keyPassword "WakeUp2024"
+            storePassword System.getenv("RELEASE_STORE_PASSWORD") ?: ""
+            keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: ""
+            keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: ""
         }
     }
 

@@ -62,6 +62,7 @@ class CourseDataManager private constructor(context: Context) {
         }
     }
 
+    @Synchronized
     fun addCourse(course: Course): Course {
         val currentCourses = _coursesFlow.value.toMutableList()
         val newId = if (currentCourses.isEmpty()) 1L else currentCourses.maxOf { it.id } + 1
@@ -72,6 +73,7 @@ class CourseDataManager private constructor(context: Context) {
         return newCourse
     }
 
+    @Synchronized
     fun addCourses(courses: List<Course>) {
         val currentCourses = _coursesFlow.value.toMutableList()
         var nextId = if (currentCourses.isEmpty()) 1L else currentCourses.maxOf { it.id } + 1
@@ -83,6 +85,7 @@ class CourseDataManager private constructor(context: Context) {
         saveCoursesToPrefs(currentCourses)
     }
 
+    @Synchronized
     fun updateCourse(course: Course) {
         val currentCourses = _coursesFlow.value.toMutableList()
         val index = currentCourses.indexOfFirst { it.id == course.id }
@@ -93,6 +96,7 @@ class CourseDataManager private constructor(context: Context) {
         }
     }
 
+    @Synchronized
     fun deleteCourse(course: Course) {
         val currentCourses = _coursesFlow.value.toMutableList()
         currentCourses.removeAll { it.id == course.id }
@@ -101,8 +105,10 @@ class CourseDataManager private constructor(context: Context) {
     }
 
     fun clearAllCourses() {
-        _coursesFlow.value = emptyList()
-        saveCoursesToPrefs(emptyList())
+        synchronized(this) {
+            _coursesFlow.value = emptyList()
+            saveCoursesToPrefs(emptyList())
+        }
     }
 
     fun refreshCourses() {

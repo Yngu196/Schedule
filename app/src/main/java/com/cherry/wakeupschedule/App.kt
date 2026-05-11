@@ -47,6 +47,12 @@ class App : Application() {
         } catch (e: Exception) {
             android.util.Log.e("App", "Failed to initialize widget update chains", e)
         }
+
+        try {
+            registerAllCourseNotifications()
+        } catch (e: Exception) {
+            android.util.Log.e("App", "Failed to restore course alarms on app init", e)
+        }
     }
 
     fun registerAllCourseNotifications() {
