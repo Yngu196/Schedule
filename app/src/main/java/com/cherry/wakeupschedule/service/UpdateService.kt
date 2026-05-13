@@ -5,6 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
+import android.view.LayoutInflater
+import android.webkit.WebView
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import com.cherry.wakeupschedule.WebViewActivity
 import kotlinx.coroutines.CoroutineScope
@@ -111,7 +114,7 @@ class UpdateService(private val context: Context) {
                 reader.close()
                 val json = JSONObject(response)
                 latestVersion = json.optString("tag_name", "").removePrefix("v")
-                releaseNotes = json.optString("body", "").take(500)
+                releaseNotes = json.optString("body", "")
 
                 // 从 assets 中获取直接的 APK 下载链接
                 val assets = json.optJSONArray("assets")
@@ -157,18 +160,64 @@ class UpdateService(private val context: Context) {
         return false
     }
 
+    // 简单的 Markdown 到 HTML 转换
+    private fun markdownToHtml(markdown: String): String {
+        var html = markdown
+            .replace(Regex("^### (.+)"), "<h3>$1</h3>")
+            .replace(Regex("^## (.+)"), "<h2>$1</h2>")
+            .replace(Regex("^# (.+)"), "<h1>$1</h1>")
+            .replace(Regex("\\*\\*(.+?)\\*\\*"), "<strong>$1</strong>")
+            .replace(Regex("\\*(.+?)\\*"), "<em>$1</em>")
+            .replace(Regex("`(.+?)`"), "<code>$1</code>")
+            .replace(Regex("^- (.+)"), "<li>$1</li>")
+            .replace(Regex("\\n\\n"), "</li><li>")
+            .replace("<li></li>", "")
+            .replace(Regex("\\n"), "<br>")
+
+        html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: sans-serif; font-size: 14px; line-height: 1.5; padding: 0; margin: 0; }
+                    h1, h2, h3 { margin-top: 16px; margin-bottom: 8px; }
+                    li { margin-left: 16px; }
+                    code { background: #f0f0f0; padding: 2px 4px; border-radius: 3px; }
+                </style>
+            </head>
+            <body>$html</body>
+            </html>
+        """.trimIndent()
+        return html
+    }
+
     // 显示更新对话框
     private fun showUpdateDialog(version: String, url: String, notes: String) {
-        val message = buildString {
-            append("发现新版本: $version\n当前版本: $currentVersion\n\n")
-            if (notes.isNotEmpty()) append("更新说明:\n${notes.take(200)}...")
+        val dialogView = LayoutInflater.from(context).inflate(com.cherry.wakeupschedule.R.layout.dialog_update, null)
+        
+        val tvVersionInfo = dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.tv_version_info)
+        val webViewNotes = dialogView.findViewById<WebView>(com.cherry.wakeupschedule.R.id.webview_notes)
+        
+        tvVersionInfo.text = "发现新版本: $version\n当前版本: $currentVersion"
+        
+        val htmlContent = markdownToHtml(notes)
+        webViewNotes.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+        
+        val dialog = AlertDialog.Builder(context)
+            .setView(dialogView)
+            .create()
+        
+        dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download).setOnClickListener {
+            openDownloadPage(url)
+            dialog.dismiss()
         }
-        AlertDialog.Builder(context)
-            .setTitle("发现新版本")
-            .setMessage(message)
-            .setPositiveButton("前往下载") { _, _ -> openDownloadPage(url) }
-            .setNegativeButton("稍后", null)
-            .show()
+        
+        dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_later).setOnClickListener {
+            dialog.dismiss()
+        }
+        
+        dialog.show()
     }
 
     private fun openDownloadPage(downloadUrl: String) {
