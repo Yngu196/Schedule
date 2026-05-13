@@ -14,6 +14,7 @@ class CourseReminderForegroundService : Service() {
     companion object {
         private const val TAG = "CourseReminderService"
         private const val NOTIFICATION_ID = 10001
+        private var isServiceRunning = false
 
         fun start(context: Context) {
             val intent = Intent(context, CourseReminderForegroundService::class.java)
@@ -29,17 +30,22 @@ class CourseReminderForegroundService : Service() {
             context.stopService(intent)
         }
 
+        @Suppress("UNUSED_PARAMETER")
         fun isRunning(context: Context): Boolean {
-            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            @Suppress("DEPRECATION")
-            val runningServices = activityManager.getRunningServices(Integer.MAX_VALUE)
-            return runningServices.any { it.service.className == CourseReminderForegroundService::class.java.name }
+            return isServiceRunning
         }
     }
 
     override fun onCreate() {
         super.onCreate()
+        isServiceRunning = true
         Log.d(TAG, "前台服务已创建")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        isServiceRunning = false
+        Log.d(TAG, "前台服务已停止")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -56,11 +62,6 @@ class CourseReminderForegroundService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        Log.d(TAG, "前台服务已停止")
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {

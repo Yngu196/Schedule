@@ -80,6 +80,23 @@ app/src/main/
 
 ## 更新日志
 
+### v1.6.8
+
+**稳定性与兼容性**
+
+- 修复修改时间表后新增课程课前提醒失效的问题
+- 统一课前闹钟注册机制，彻底解决单次闹钟与整学期闹钟并行导致的闹钟遗漏
+- `cancelCourseAlarm()` 现可正确取消课程的所有周次闹钟
+- 作息表修改后自动刷新所有课前提醒
+- 应用启动时自动恢复课前闹钟，确保进程被系统杀死后闹钟不丢失
+
+**代码质量**
+
+- 移除所有已废弃 API 的使用（`startActivityForResult`、`getSerializableExtra`、`activeNetworkInfo`、`COLUMN_LOCAL_FILENAME`）
+- 所有文件访问统一使用 FileProvider，消除 `FileUriExposedException` 风险
+- WebView 安全加固：禁用文件/内容访问，JavaScript 接口增加域名白名单校验
+- CourseDataManager 并发读写添加同步锁，防止多线程场景数据损坏
+
 ### v1.6.6
 
 - 修复小组件在课少/无课/凌晨场景下不更新的问题，新增多重更新链保障

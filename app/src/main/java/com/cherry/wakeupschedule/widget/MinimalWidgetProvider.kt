@@ -81,9 +81,19 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + MINIMAL_PERIODIC_UPDATE_INTERVAL, pendingIntent)
+                alarmManager.setInexactRepeating(
+                    AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis() + MINIMAL_PERIODIC_UPDATE_INTERVAL,
+                    MINIMAL_PERIODIC_UPDATE_INTERVAL,
+                    pendingIntent
+                )
             } else {
-                alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + MINIMAL_PERIODIC_UPDATE_INTERVAL, pendingIntent)
+                alarmManager.setInexactRepeating(
+                    AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis() + MINIMAL_PERIODIC_UPDATE_INTERVAL,
+                    MINIMAL_PERIODIC_UPDATE_INTERVAL,
+                    pendingIntent
+                )
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -110,19 +120,21 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         try {
             val calendar = Calendar.getInstance()
             val dayOfWeek = if (calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) 7 else calendar.get(Calendar.DAY_OF_WEEK) - 1
-            val currentTime = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+            val currentTimeSeconds = calendar.get(Calendar.HOUR_OF_DAY) * 3600 + calendar.get(Calendar.MINUTE) * 60 + calendar.get(Calendar.SECOND)
+            val currentTimeMinutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
             val currentWeek = calculateCurrentWeek(SettingsManager(context))
 
             val todayEndCourses = CourseDataManager.getInstance(context).getAllCourses()
                 .filter { it.dayOfWeek == dayOfWeek && currentWeek in it.startWeek..it.endWeek && isCourseInCurrentWeekType(it, currentWeek) }
-                .mapNotNull { val end = getCourseEndMinutes(context, it); if (end > currentTime) end to it else null }
+                .mapNotNull { val end = getCourseEndMinutes(context, it); if (end > currentTimeMinutes) end to it else null }
                 .sortedBy { it.first }
 
             if (todayEndCourses.isEmpty()) {
                 cancelMinimalCourseEndUpdate(context)
                 return
             }
-            val delayMillis = (todayEndCourses[0].first - currentTime) * 60 * 1000L
+            val endSeconds = todayEndCourses[0].first * 60
+            val delayMillis = (endSeconds - currentTimeSeconds) * 1000L
             if (delayMillis <= 0) {
                 cancelMinimalCourseEndUpdate(context)
                 triggerWidgetUpdate(context)
@@ -208,7 +220,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
             val adjustedDayOfWeek = if (dayOfWeek == Calendar.SUNDAY) 7 else dayOfWeek - 1
             val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
             val currentMinute = calendar.get(Calendar.MINUTE)
+            val currentSecond = calendar.get(Calendar.SECOND)
             val currentTime = currentHour * 60 + currentMinute
+            val currentTimeSeconds = currentHour * 3600 + currentMinute * 60 + currentSecond
 
             val currentWeek = calculateCurrentWeek(settingsManager)
 
@@ -231,9 +245,11 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 currentCourse != null -> {
                     views.setTextViewText(R.id.tv_widget_title, "下课倒计时")
                     views.setTextViewText(R.id.tv_course_name, currentCourse.name)
-                    val endMinutes = getCourseEndMinutes(context, currentCourse)
-                    val remainingMinutes = endMinutes - currentTime
-                    views.setTextViewText(R.id.tv_countdown, "${remainingMinutes}分钟")
+                    val endSeconds = getCourseEndMinutes(context, currentCourse) * 60
+                    val remainingSeconds = (endSeconds - currentTimeSeconds).coerceAtLeast(0)
+                    val mins = remainingSeconds / 60
+                    val secs = remainingSeconds % 60
+                    views.setTextViewText(R.id.tv_countdown, "${mins}分${secs}秒")
                     views.setTextViewText(R.id.tv_course_time, "后下课")
                 }
                 else -> {

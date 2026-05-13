@@ -41,6 +41,13 @@ class WebViewActivity : AppCompatActivity() {
     private lateinit var importService: ImportService
     private var autoFillPassword: Boolean = false
 
+    private val allowedDomains = listOf(
+        // 常见教务系统域名（不含子域名匹配）
+        "jw", "jwc", "jwxt", "edu", "edu.cn", "educom", "jiaowu",
+        // 蓝奏云
+        "lanzou", "lanzoui", "lanzoux", "lanzouo"
+    )
+
     // 下载监听
     private var downloadReceiver: BroadcastReceiver? = null
     private var currentDownloadId: Long = -1
@@ -108,7 +115,6 @@ class WebViewActivity : AppCompatActivity() {
 
                     // 尝试获取文件URI和文件名（兼容不同Android版本）
                     try {
-                        // 优先使用COLUMN_LOCAL_URI
                         val uriColumnIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
                         if (uriColumnIndex != -1) {
                             val uriString = cursor.getString(uriColumnIndex)
@@ -117,21 +123,7 @@ class WebViewActivity : AppCompatActivity() {
                             }
                         }
 
-                        // 如果COLUMN_LOCAL_URI失败，尝试使用COLUMN_LOCAL_FILENAME
                         if (sourceUri == null) {
-                            @Suppress("DEPRECATION")
-                            val filenameColumnIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_FILENAME)
-                            if (filenameColumnIndex != -1) {
-                                val filename = cursor.getString(filenameColumnIndex)
-                                if (!filename.isNullOrEmpty()) {
-                                    sourceUri = Uri.fromFile(java.io.File(filename))
-                                }
-                            }
-                        }
-
-                        // 如果都失败，尝试使用COLUMN_URI
-                        if (sourceUri == null) {
-                            @Suppress("DEPRECATION")
                             val uriColIdx = cursor.getColumnIndex(DownloadManager.COLUMN_URI)
                             if (uriColIdx != -1) {
                                 val uriString = cursor.getString(uriColIdx)
@@ -200,10 +192,29 @@ class WebViewActivity : AppCompatActivity() {
     private fun setupWebView(url: String) {
         binding.webView.apply {
             webViewClient = object : WebViewClient() {
+                private fun isUrlAllowed(url: String): Boolean {
+                    return try {
+                        val host = Uri.parse(url).host ?: return true
+                        allowedDomains.any { domain -> host.contains(domain, ignoreCase = true) }
+                    } catch (e: Exception) {
+                        true
+                    }
+                }
+
                 @Deprecated("Deprecated in Java")
                 @SuppressLint("Deprecated")
                 override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                     url?.let {
+                        if (!isUrlAllowed(it)) {
+                            Log.w("WebViewActivity", "拦截外部域名跳转: $it")
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it))
+                                startActivity(intent)
+                            } catch (e: Exception) {
+                                Log.e("WebViewActivity", "无法打开外部链接", e)
+                            }
+                            return true
+                        }
                         // 拦截特定的URL，尝试解析课程表
                         if (it.contains("xskbcx.aspx") || it.contains("course") || it.contains("schedule") ||
                             it.contains("kb") || it.contains("timetable") || it.contains("课表") ||
@@ -252,8 +263,8 @@ class WebViewActivity : AppCompatActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                allowFileAccess = true
-                allowContentAccess = true
+                allowFileAccess = false
+                allowContentAccess = false
 
                 // 启用更多功能以支持复杂的教务系统
                 javaScriptCanOpenWindowsAutomatically = true
@@ -343,17 +354,16 @@ class WebViewActivity : AppCompatActivity() {
             // 检查DownloadManager是否可用
             val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             
-            // 检查网络连接
             val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-            @Suppress("DEPRECATION")
-            val networkInfo = connectivityManager.activeNetworkInfo
-            @Suppress("DEPRECATION")
-            if (networkInfo == null || !networkInfo.isConnected) {
+            val currentNetwork = connectivityManager.activeNetwork
+            val networkCapabilities = if (currentNetwork != null) {
+                connectivityManager.getNetworkCapabilities(currentNetwork)
+            } else null
+            if (networkCapabilities == null || !networkCapabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
                 Toast.makeText(this, "请检查网络连接", Toast.LENGTH_LONG).show()
                 return
             }
-            @Suppress("DEPRECATION")
-            Log.d("WebViewActivity", "网络状态: ${networkInfo.typeName}, 已连接: ${networkInfo.isConnected}")
+            Log.d("WebViewActivity", "网络已连接")
             
             // 解析文件名
             var fileName = "schedule_${System.currentTimeMillis()}.xls"
@@ -395,19 +405,8 @@ class WebViewActivity : AppCompatActivity() {
                 .setAllowedOverRoaming(true)
             
             // 设置下载目标路径 - 使用应用外部文件目录（不需要额外权限）
-            val downloadDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-            if (downloadDir != null) {
-                if (!downloadDir.exists()) {
-                    downloadDir.mkdirs()
-                }
-                val destFile = File(downloadDir, fileName)
-                request.setDestinationUri(Uri.fromFile(destFile))
-                Log.d("WebViewActivity", "下载目标路径: ${destFile.absolutePath}")
-            } else {
-                // 如果外部目录不可用，使用公共下载目录
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-                Log.d("WebViewActivity", "使用公共下载目录")
-            }
+            request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, fileName)
+            Log.d("WebViewActivity", "下载目标: ${getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)}/$fileName")
             
             // 添加Cookie - 这是关键，让DownloadManager使用WebView的会话
             val cookies = CookieManager.getInstance().getCookie(url)
@@ -868,8 +867,22 @@ class WebViewActivity : AppCompatActivity() {
 
 
     inner class WebAppInterface {
+        private fun isCurrentUrlTrusted(): Boolean {
+            val currentUrl = binding.webView.url ?: return false
+            return try {
+                val host = Uri.parse(currentUrl).host ?: return false
+                allowedDomains.any { domain -> host.contains(domain, ignoreCase = true) }
+            } catch (e: Exception) {
+                false
+            }
+        }
+
         @JavascriptInterface
         fun onCoursesParsed(coursesJson: String) {
+            if (!isCurrentUrlTrusted()) {
+                Log.w("WebViewActivity", "拦截来自不受信任页面的JavaScript接口调用: ${binding.webView.url}")
+                return
+            }
             Log.d("WebViewActivity", "解析到课程数据: $coursesJson")
 
             CoroutineScope(Dispatchers.Main).launch {
@@ -933,6 +946,10 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun onNoCoursesFound() {
+            if (!isCurrentUrlTrusted()) {
+                Log.w("WebViewActivity", "拦截来自不受信任页面的JavaScript接口调用: ${binding.webView.url}")
+                return
+            }
             Log.w("WebViewActivity", "未找到课程表数据")
 
             CoroutineScope(Dispatchers.Main).launch {

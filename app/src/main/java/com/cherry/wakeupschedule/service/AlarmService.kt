@@ -128,6 +128,7 @@ class AlarmService(private val context: Context) {
     /**
      * 取消课程的闹钟
      * 同时取消AlarmManager闹钟和WorkManager提醒
+     * 以及整学期所有周次的预设闹钟
      *
      * @param course 要取消闹钟的课程
      */
@@ -140,6 +141,18 @@ class AlarmService(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         alarmManager.cancel(pendingIntent)
+
+        // 同时取消整学期所有周次的预设闹钟（requestCode = course.id * 100 + week）
+        for (week in 1..20) {
+            val weekIntent = Intent(context, AlarmReceiver::class.java)
+            val weekPendingIntent = PendingIntent.getBroadcast(
+                context,
+                (course.id * 100 + week).toInt(),
+                weekIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(weekPendingIntent)
+        }
 
         // 同时取消WorkManager的提醒
         ExactAlarmWorker.cancelReminder(context, course.id)
@@ -212,19 +225,7 @@ class AlarmService(private val context: Context) {
      * 在应用启动或设置更改时调用
      */
     fun scheduleAllReminders() {
-        // 启动定期检查Worker
-        CourseReminderWorker.schedulePeriodicCheck(context)
-        // 启动前台服务（如果需要）
-        scheduleForegroundServiceIfNeeded()
-
-        // 为所有启用了闹钟的课程设置提醒
-        val allCourses = CourseDataManager.getInstance(context).getAllCourses()
-        allCourses.forEach { course ->
-            if (course.alarmEnabled) {
-                setCourseAlarm(course)
-            }
-        }
-        Log.d("AlarmService", "Scheduled all reminders for ${allCourses.size} courses")
+        registerAllCourseNotifications()
     }
 
     /**
@@ -241,7 +242,12 @@ class AlarmService(private val context: Context) {
         scheduleForegroundServiceIfNeeded()
 
         val allCourses = CourseDataManager.getInstance(context).getAllCourses()
-        val semesterEndWeek = 20  // 假设学期最多20周
+        val semesterEndWeek = allCourses.maxOfOrNull { it.endWeek } ?: 20
+
+        // 先取消所有课程的旧闹钟，避免作息表变更后旧闹钟与新学期时间冲突
+        allCourses.forEach { course ->
+            cancelCourseAlarm(course)
+        }
 
         // 为每门课程的每周安排通知
         allCourses.forEach { course ->

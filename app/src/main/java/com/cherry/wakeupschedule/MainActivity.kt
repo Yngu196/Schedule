@@ -1,5 +1,6 @@
 package com.cherry.wakeupschedule
 
+import androidx.activity.result.contract.ActivityResultContracts
 import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -78,9 +79,16 @@ class MainActivity : AppCompatActivity() {
 
     private val countdownHandler = Handler(Looper.getMainLooper())
     private var countdownRunnable: Runnable? = null
+    private var countdownTickCount = 0
 
     // 视图状态："week"周视图，"day"日视图，"overview"课程全览
     private var currentViewState = "week"
+
+    private val importFileLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { importFromFile(it) }
+    }
 
     // 拖动相关
     private var isDragging = false
@@ -789,23 +797,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialogView.findViewById<TextView>(R.id.btn_import_excel).setOnClickListener {
-            // 实现Excel导入
-            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                type = "*/*"
-                addCategory(Intent.CATEGORY_OPENABLE)
-            }
-            @Suppress("DEPRECATION")
-            startActivityForResult(intent, REQUEST_CODE_IMPORT_FILE)
+            importFileLauncher.launch("*/*")
             dialog.dismiss()
         }
 
         dialogView.findViewById<TextView>(R.id.btn_import_file).setOnClickListener {
-            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                type = "*/*"
-                addCategory(Intent.CATEGORY_OPENABLE)
-            }
-            @Suppress("DEPRECATION")
-            startActivityForResult(intent, REQUEST_CODE_IMPORT_FILE)
+            importFileLauncher.launch("*/*")
             dialog.dismiss()
         }
 
@@ -938,11 +935,14 @@ class MainActivity : AppCompatActivity() {
                 }
                 uri
             } else {
-                // Android 9 及以下，保存到 Downloads 目录
                 val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
                 val file = File(downloadsDir, fileName)
                 file.writeText(content, StandardCharsets.UTF_8)
-                android.net.Uri.fromFile(file)
+                androidx.core.content.FileProvider.getUriForFile(
+                    this,
+                    "${packageName}.fileprovider",
+                    file
+                )
             }
         } catch (e: Exception) {
             Log.e("MainActivity", "保存到公共目录失败", e)
@@ -1237,7 +1237,7 @@ class MainActivity : AppCompatActivity() {
 
             // 高亮样式
             if (isHighlight) {
-                cardView.cardElevation = 12f
+                cardView.cardElevation = resources.getDimension(R.dimen.card_elevation_highlight)
                 cardView.setCardBackgroundColor(Color.argb(
                     Color.alpha(color),
                     Math.min(Color.red(color) + 30, 255),
@@ -1511,7 +1511,11 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 val importService = ImportService(this@MainActivity)
-                val uri = Uri.fromFile(file)
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    this@MainActivity,
+                    "${packageName}.fileprovider",
+                    file
+                )
                 val success = importService.importFromFile(uri)
 
                 // 清除待导入标记
@@ -1529,16 +1533,6 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 Toast.makeText(this@MainActivity, "导入错误: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_CODE_IMPORT_FILE && resultCode == RESULT_OK) {
-            data?.data?.let { uri ->
-                // 处理文件导入
-                importFromFile(uri)
             }
         }
     }
@@ -1658,10 +1652,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun startCountdown() {
         countdownRunnable?.let { countdownHandler.removeCallbacks(it) }
+        countdownTickCount = 0
         countdownRunnable = object : Runnable {
             override fun run() {
                 updateCountdown()
-                countdownHandler.postDelayed(this, 60000)
+                countdownTickCount++
+                countdownHandler.postDelayed(this, 1000)
             }
         }
         countdownRunnable?.let { countdownHandler.post(it) }
@@ -1678,6 +1674,7 @@ class MainActivity : AppCompatActivity() {
         val adjustedDayOfWeek = if (currentDayOfWeek == Calendar.SUNDAY) 7 else currentDayOfWeek - 1
 
         val now = Calendar.getInstance()
+        val currentSeconds = now.get(Calendar.HOUR_OF_DAY) * 3600 + now.get(Calendar.MINUTE) * 60 + now.get(Calendar.SECOND)
         val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
 
         val todayCourses = allCourses.filter { course ->
@@ -1705,16 +1702,16 @@ class MainActivity : AppCompatActivity() {
 
         when {
             currentCourse != null -> {
-                val endMinutes = getCourseEndMinutes(currentCourse)
-                val remainingMinutes = endMinutes - currentMinutes
+                val endSeconds = getCourseEndMinutes(currentCourse) * 60
+                val remainingSeconds = (endSeconds - currentSeconds).coerceAtLeast(0)
                 binding.tvCountdown.visibility = View.VISIBLE
-                binding.tvCountdown.text = getString(R.string.countdown_class_end, formatDuration(remainingMinutes))
+                binding.tvCountdown.text = getString(R.string.countdown_class_end, formatDurationSeconds(remainingSeconds))
             }
             nextCourse != null -> {
-                val startMinutes = getCourseStartMinutes(nextCourse)
-                val remainingMinutes = startMinutes - currentMinutes
+                val startSeconds = getCourseStartMinutes(nextCourse) * 60
+                val remainingSeconds = (startSeconds - currentSeconds).coerceAtLeast(0)
                 binding.tvCountdown.visibility = View.VISIBLE
-                binding.tvCountdown.text = getString(R.string.countdown_format, formatDuration(remainingMinutes))
+                binding.tvCountdown.text = getString(R.string.countdown_format, formatDurationSeconds(remainingSeconds))
             }
             todayCourses.isNotEmpty() -> {
                 binding.tvCountdown.visibility = View.VISIBLE
@@ -1725,12 +1722,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (currentViewState == "week" && allCourses.isNotEmpty()) {
-            displayCourses(allCourses)
-            syncTimeAxisHeight()
+        if (countdownTickCount % 30 == 0) {
+            if (currentViewState == "week" && allCourses.isNotEmpty()) {
+                displayCourses(allCourses)
+                syncTimeAxisHeight()
+            }
+            updateDateDisplay()
         }
-
-        updateDateDisplay()
     }
 
     private fun getCourseStartMinutes(course: Course): Int {
@@ -1773,15 +1771,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun formatDuration(minutes: Int): String {
+    private fun formatDurationSeconds(totalSeconds: Int): String {
         return when {
-            minutes >= 60 -> {
-                val hours = minutes / 60
-                val mins = minutes % 60
-                if (mins > 0) "${hours}小时${mins}分钟" else "${hours}小时"
+            totalSeconds >= 3600 -> {
+                val hours = totalSeconds / 3600
+                val mins = (totalSeconds % 3600) / 60
+                val secs = totalSeconds % 60
+                when {
+                    mins > 0 && secs > 0 -> "${hours}小时${mins}分${secs}秒"
+                    mins > 0 -> "${hours}小时${mins}分钟"
+                    else -> "${hours}小时"
+                }
             }
-            minutes > 0 -> "${minutes}分钟"
-            else -> "0分钟"
+            totalSeconds >= 60 -> {
+                val mins = totalSeconds / 60
+                val secs = totalSeconds % 60
+                if (secs > 0) "${mins}分${secs}秒" else "${mins}分钟"
+            }
+            else -> "${totalSeconds}秒"
         }
     }
 
@@ -1794,7 +1801,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    companion object {
-        private const val REQUEST_CODE_IMPORT_FILE = 1001
     }
-}

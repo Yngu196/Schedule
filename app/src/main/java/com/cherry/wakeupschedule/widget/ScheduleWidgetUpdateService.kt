@@ -131,7 +131,6 @@ class WidgetPeriodicUpdateReceiver : BroadcastReceiver() {
                     ComponentName(it, ScheduleWidgetProvider::class.java)
                 )
             )
-            ScheduleWidgetProvider().schedulePeriodicUpdate(it)
             ScheduleWidgetUpdateService.scheduleNextUpdate(it)
         }
     }
@@ -147,7 +146,6 @@ class MinimalWidgetPeriodicReceiver : BroadcastReceiver() {
                     ComponentName(it, MinimalWidgetProvider::class.java)
                 )
             )
-            MinimalWidgetProvider().schedulePeriodicUpdate(it)
             ScheduleWidgetUpdateService.scheduleNextUpdate(it)
         }
     }

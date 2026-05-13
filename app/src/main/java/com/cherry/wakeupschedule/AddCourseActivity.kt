@@ -272,12 +272,12 @@ class AddCourseActivity : AppCompatActivity() {
         if (existingCourseExtra != null) {
             viewModel.updateCourse(course)
             Toast.makeText(this, "课程更新成功", Toast.LENGTH_SHORT).show()
-            App.instance.alarmService?.setCourseAlarm(course)
         } else {
             viewModel.addCourse(course)
             Toast.makeText(this, "课程添加成功", Toast.LENGTH_SHORT).show()
-            App.instance.alarmService?.setCourseAlarm(course)
         }
+        // 重新注册所有课程闹钟：编辑时需取消旧的周次闹钟，新增时需建立完整的周次提醒链
+        App.instance.registerAllCourseNotifications()
         ScheduleWidgetUpdateService.triggerUpdate(this)
         finish()
     }

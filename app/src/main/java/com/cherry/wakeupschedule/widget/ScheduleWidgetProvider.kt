@@ -82,11 +82,12 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + PERIODIC_UPDATE_INTERVAL, pendingIntent)
-            } else {
-                alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + PERIODIC_UPDATE_INTERVAL, pendingIntent)
-            }
+            alarmManager.setInexactRepeating(
+                AlarmManager.RTC_WAKEUP,
+                System.currentTimeMillis() + PERIODIC_UPDATE_INTERVAL,
+                PERIODIC_UPDATE_INTERVAL,
+                pendingIntent
+            )
         } catch (e: Exception) { e.printStackTrace() }
     }
 
@@ -149,19 +150,21 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
         try {
             val calendar = Calendar.getInstance()
             val dayOfWeek = if (calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) 7 else calendar.get(Calendar.DAY_OF_WEEK) - 1
-            val currentTime = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+            val currentTimeSeconds = calendar.get(Calendar.HOUR_OF_DAY) * 3600 + calendar.get(Calendar.MINUTE) * 60 + calendar.get(Calendar.SECOND)
+            val currentTimeMinutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
             val currentWeek = calculateCurrentWeek(SettingsManager(context))
 
             val todayEndCourses = CourseDataManager.getInstance(context).getAllCourses()
                 .filter { it.dayOfWeek == dayOfWeek && currentWeek in it.startWeek..it.endWeek && isCourseInCurrentWeekType(it, currentWeek) }
-                .mapNotNull { val end = getCourseEndTimeInMinutes(context, it); if (end > currentTime) end to it else null }
+                .mapNotNull { val end = getCourseEndTimeInMinutes(context, it); if (end > currentTimeMinutes) end to it else null }
                 .sortedBy { it.first }
 
             if (todayEndCourses.isEmpty()) {
                 cancelCourseEndUpdate(context)
                 return
             }
-            val delayMillis = (todayEndCourses[0].first - currentTime) * 60 * 1000L
+            val endSeconds = todayEndCourses[0].first * 60
+            val delayMillis = (endSeconds - currentTimeSeconds) * 1000L
             if (delayMillis <= 0) { cancelCourseEndUpdate(context); triggerWidgetUpdate(context); return }
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager

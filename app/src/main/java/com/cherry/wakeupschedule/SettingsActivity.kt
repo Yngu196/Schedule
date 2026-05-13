@@ -59,6 +59,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var btnColorTheme: TextView
     private lateinit var btnCheckUpdate: TextView
     private lateinit var btnPermissionGuide: TextView
+    private lateinit var btnFeedback: TextView
     private lateinit var timeTableManager: TimeTableManager
     private lateinit var updateService: com.cherry.wakeupschedule.service.UpdateService
 
@@ -96,7 +97,12 @@ class SettingsActivity : AppCompatActivity() {
                 putExtra("outputY", 1920)
                 putExtra("scale", true)
                 putExtra("return-data", false)
-                val outputUri = Uri.fromFile(File(cacheDir, "cropped_bg_${System.currentTimeMillis()}.jpg"))
+                val outputFile = File(cacheDir, "cropped_bg_${System.currentTimeMillis()}.jpg")
+                val outputUri = androidx.core.content.FileProvider.getUriForFile(
+                    this@SettingsActivity,
+                    "${packageName}.fileprovider",
+                    outputFile
+                )
                 putExtra(MediaStore.EXTRA_OUTPUT, outputUri)
                 putExtra("outputFormat", Bitmap.CompressFormat.JPEG.name)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -153,6 +159,7 @@ class SettingsActivity : AppCompatActivity() {
         btnColorTheme = findViewById(R.id.btn_color_theme)
         btnCheckUpdate = findViewById(R.id.btn_check_update)
         btnPermissionGuide = findViewById(R.id.btn_permission_guide)
+        btnFeedback = findViewById(R.id.btn_feedback)
 
         // 初始化更新服务
         updateService = com.cherry.wakeupschedule.service.UpdateService(this)
@@ -228,6 +235,10 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, PermissionGuideActivity::class.java))
         }
 
+        btnFeedback.setOnClickListener {
+            showFeedbackDialog()
+        }
+
         btnTimeTableSettings.setOnClickListener {
             // 直接跳转到新的时间表编辑界面
             startActivity(Intent(this, TimeTableEditActivity::class.java))
@@ -261,9 +272,10 @@ class SettingsActivity : AppCompatActivity() {
                             .setTitle("确认重置")
                             .setMessage("确定要重置为默认时间表吗？")
                             .setPositiveButton("确定") { _, _ ->
-                                timeTableManager.resetToDefault()
-                                Toast.makeText(this, "已重置为默认时间表", Toast.LENGTH_SHORT).show()
-                            }
+                        timeTableManager.resetToDefault()
+                        App.instance.registerAllCourseNotifications()
+                        Toast.makeText(this, "已重置为默认时间表", Toast.LENGTH_SHORT).show()
+                    }
                             .setNegativeButton("取消", null)
                             .show()
                     }
@@ -323,6 +335,7 @@ class SettingsActivity : AppCompatActivity() {
                     timeTableManager.removeTimeSlot(timeSlot.node)
                 }
                 timeTableManager.updateTimeSlot(node, startTime, endTime)
+                App.instance.registerAllCourseNotifications()
                 Toast.makeText(this, "第${node}节时间段已更新", Toast.LENGTH_SHORT).show()
 
                 // 重新打开编辑器显示更新后的列表
@@ -333,9 +346,10 @@ class SettingsActivity : AppCompatActivity() {
                     .setTitle("确认删除")
                     .setMessage("确定要删除第${timeSlot.node}节吗？")
                     .setPositiveButton("删除") { _, _ ->
-                        timeTableManager.removeTimeSlot(timeSlot.node)
-                        Toast.makeText(this, "第${timeSlot.node}节已删除", Toast.LENGTH_SHORT).show()
-                    }
+                    timeTableManager.removeTimeSlot(timeSlot.node)
+                    App.instance.registerAllCourseNotifications()
+                    Toast.makeText(this, "第${timeSlot.node}节已删除", Toast.LENGTH_SHORT).show()
+                }
                     .setNegativeButton("取消", null)
                     .show()
             }
@@ -384,7 +398,8 @@ class SettingsActivity : AppCompatActivity() {
                 }
 
                 timeTableManager.addTimeSlot(node, startTime, endTime)
-                Toast.makeText(this, "第${node}节时间段已添加", Toast.LENGTH_SHORT).show()
+            App.instance.registerAllCourseNotifications()
+            Toast.makeText(this, "第${node}节时间段已添加", Toast.LENGTH_SHORT).show()
 
                 // 重新打开编辑器显示更新后的列表
                 showTimeSlotsEditor()
@@ -420,7 +435,8 @@ class SettingsActivity : AppCompatActivity() {
                 }
 
                 Toast.makeText(this, "每天节数已设置为 $maxNodes 节", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
+            App.instance.registerAllCourseNotifications()
+            dialog.dismiss()
             }
             .setNegativeButton("取消", null)
             .show()
@@ -957,6 +973,56 @@ class SettingsActivity : AppCompatActivity() {
             .setPositiveButton("确定", null)
             .show()
     }
+
+    private fun showFeedbackDialog() {
+        val options = arrayOf("GitHub Issue（功能需求、Bug反馈）", "发送邮件（其他反馈或联系开发者）")
+
+        AlertDialog.Builder(this)
+            .setTitle("选择反馈方式")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> openGitHubIssues()
+                    1 -> sendFeedbackEmail()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun openGitHubIssues() {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Yngvau/Schedule/issues"))
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "无法打开链接，请检查网络连接", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun sendFeedbackEmail() {
+        try {
+            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("mailto:")
+                putExtra(Intent.EXTRA_EMAIL, arrayOf("Yngu196@qq.com"))
+                putExtra(Intent.EXTRA_SUBJECT, "Schedule 应用反馈")
+                putExtra(Intent.EXTRA_TEXT, """
+                    应用版本: ${BuildConfig.VERSION_NAME}
+                    设备信息: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}
+                    Android版本: ${android.os.Build.VERSION.RELEASE}
+
+                    ---
+
+                    请在此处描述您的反馈或建议：
+                """.trimIndent())
+            }
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(Intent.createChooser(intent, "发送邮件"))
+            } else {
+                Toast.makeText(this, "未找到邮件应用", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "无法打开邮件应用: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
     
     private fun applyBackgroundSettings() {
         // 这里可以实现背景切换逻辑
@@ -971,11 +1037,11 @@ class SettingsActivity : AppCompatActivity() {
     private fun applyAlarmSettings() {
         val alarmEnabled = settingsManager.isAlarmEnabled()
         try {
-            val alarmService = com.cherry.wakeupschedule.App.instance.alarmService
+            val app = com.cherry.wakeupschedule.App.instance
             if (alarmEnabled) {
-                alarmService?.scheduleAllReminders()
+                app.registerAllCourseNotifications()
             } else {
-                alarmService?.cancelAllReminders()
+                app.alarmService?.cancelAllReminders()
             }
         } catch (e: Exception) {
             android.util.Log.e("SettingsActivity", "Failed to apply alarm settings", e)

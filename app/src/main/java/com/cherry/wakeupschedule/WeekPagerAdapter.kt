@@ -107,7 +107,7 @@ class WeekPagerAdapter(
                 }
                 setCardBackgroundColor(courseColors[index % courseColors.size])
                 radius = 6f
-                cardElevation = 1f
+                cardElevation = context.resources.getDimension(R.dimen.card_elevation_normal)
 
                 // 如果不是当前显示的周，降低透明度
                 alpha = if (isCurrentWeek) 1.0f else 0.3f

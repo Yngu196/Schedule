@@ -97,6 +97,7 @@ class ExactAlarmWorker(
     private fun rescheduleNextWeek(course: Course) {
         try {
             val calendar = Calendar.getInstance()
+            calendar.set(Calendar.DAY_OF_WEEK, course.dayOfWeek + 1)
             calendar.add(Calendar.DAY_OF_YEAR, 7)
 
             val timeTableManager = TimeTableManager.getInstance(applicationContext)
