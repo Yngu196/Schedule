@@ -9,10 +9,17 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 
+/**
+ * 电池优化辅助工具
+ * 用于处理各种厂商系统的电池优化问题，确保闹钟能正常工作
+ */
 object BatteryOptimizationHelper {
 
     private const val TAG = "BatteryOptimizationHelper"
 
+    /**
+     * 各厂商电源管理页面Intent列表
+     */
     private val MANUFACTURER_POWER_MANAGER_INTENTS = listOf(
         Intent().setClassName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
         Intent().setClassName("com.letv.android.letvsafe", "com.letv.android.letvsafe.AutobootManageActivity"),
@@ -33,11 +40,17 @@ object BatteryOptimizationHelper {
         Intent().setClassName("com.tencent.android.qqpimsecure", "com.tencent.aa.ui.MainActivity"),
     )
 
+    /**
+     * 检查是否已忽略电池优化
+     */
     fun isIgnoringBatteryOptimizations(context: Context): Boolean {
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         return powerManager.isIgnoringBatteryOptimizations(context.packageName)
     }
 
+    /**
+     * 请求忽略电池优化
+     */
     fun requestIgnoreBatteryOptimizations(context: Context): Boolean {
         if (isIgnoringBatteryOptimizations(context)) {
             Log.d(TAG, "Already ignoring battery optimizations")
@@ -59,6 +72,9 @@ object BatteryOptimizationHelper {
         return openBatteryOptimizationSettings(context)
     }
 
+    /**
+     * 打开电池优化设置页面
+     */
     fun openBatteryOptimizationSettings(context: Context): Boolean {
         try {
             val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
@@ -74,6 +90,9 @@ object BatteryOptimizationHelper {
         return true
     }
 
+    /**
+     * 打开厂商特定的电源管理设置页面
+     */
     fun openManufacturerPowerSettings(context: Context): Boolean {
         for (intent in MANUFACTURER_POWER_MANAGER_INTENTS) {
             if (isIntentAvailable(context, intent)) {
@@ -102,10 +121,16 @@ object BatteryOptimizationHelper {
         return false
     }
 
+    /**
+     * 获取设备厂商名称
+     */
     fun getManufacturerName(): String {
         return Build.MANUFACTURER.lowercase()
     }
 
+    /**
+     * 检查是否为中国厂商
+     */
     fun isChineseManufacturer(): Boolean {
         val manufacturer = getManufacturerName()
         return manufacturer in listOf(
@@ -120,6 +145,9 @@ object BatteryOptimizationHelper {
         )
     }
 
+    /**
+     * 检查是否需要特殊处理
+     */
     fun needsSpecialHandling(): Boolean {
         val manufacturer = getManufacturerName()
         return manufacturer in listOf(
@@ -131,6 +159,9 @@ object BatteryOptimizationHelper {
         )
     }
 
+    /**
+     * 检查Intent是否可用
+     */
     private fun isIntentAvailable(context: Context, intent: Intent): Boolean {
         return try {
             @Suppress("DEPRECATION")
@@ -143,6 +174,9 @@ object BatteryOptimizationHelper {
         }
     }
 
+    /**
+     * 获取厂商自启动设置Intent
+     */
     fun getAutoStartIntent(context: Context): Intent? {
         for (intent in MANUFACTURER_POWER_MANAGER_INTENTS) {
             if (isIntentAvailable(context, intent)) {
@@ -152,6 +186,9 @@ object BatteryOptimizationHelper {
         return null
     }
 
+    /**
+     * 获取详细的设置说明
+     */
     fun getDetailedInstructions(@Suppress("UNUSED_PARAMETER") context: Context): String {
         val manufacturer = getManufacturerName()
         return when {

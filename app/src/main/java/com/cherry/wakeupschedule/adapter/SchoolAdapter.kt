@@ -8,6 +8,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.cherry.wakeupschedule.R
 import com.cherry.wakeupschedule.School
 
+/**
+ * 学校列表适配器
+ * 用于显示可导入课程的学校列表
+ */
 class SchoolAdapter(
     private val schools: List<School>,
     private val onSchoolClick: (School) -> Unit
@@ -26,6 +30,9 @@ class SchoolAdapter(
 
     override fun getItemCount(): Int = schools.size
 
+    /**
+     * 学校列表项ViewHolder
+     */
     class SchoolViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvSchoolName: TextView = itemView.findViewById(R.id.tv_school_name)
         

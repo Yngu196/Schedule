@@ -12,6 +12,10 @@ import androidx.core.content.ContextCompat
 import com.cherry.wakeupschedule.MainActivity
 import com.cherry.wakeupschedule.R
 
+/**
+ * 通知辅助工具
+ * 用于创建和管理课程提醒通知
+ */
 class NotificationHelper(private val context: Context) {
 
     companion object {
@@ -21,6 +25,9 @@ class NotificationHelper(private val context: Context) {
         const val FOREGROUND_CHANNEL_NAME = "课程提醒服务"
     }
 
+    /**
+     * 创建通知渠道
+     */
     fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -49,6 +56,9 @@ class NotificationHelper(private val context: Context) {
         }
     }
 
+    /**
+     * 构建课程提醒通知
+     */
     fun buildCourseReminderNotification(
         courseName: String,
         teacher: String,
@@ -94,6 +104,9 @@ class NotificationHelper(private val context: Context) {
             .build()
     }
 
+    /**
+     * 构建前台服务通知
+     */
     fun buildForegroundNotification(): android.app.Notification {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -117,6 +130,9 @@ class NotificationHelper(private val context: Context) {
             .build()
     }
 
+    /**
+     * 显示通知
+     */
     fun showNotification(notificationId: Int, notification: android.app.Notification) {
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
             == android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -124,10 +140,16 @@ class NotificationHelper(private val context: Context) {
         }
     }
 
+    /**
+     * 取消通知
+     */
     fun cancelNotification(notificationId: Int) {
         NotificationManagerCompat.from(context).cancel(notificationId)
     }
 
+    /**
+     * 根据课程ID获取通知ID
+     */
     fun getNotificationId(courseId: Long): Int {
         return courseId.toInt()
     }

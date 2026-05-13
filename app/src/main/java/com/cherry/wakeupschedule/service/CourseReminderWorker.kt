@@ -15,6 +15,10 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
+/**
+ * 课程提醒定期检查Worker
+ * 定时检查即将开始的课程并设置提醒
+ */
 class CourseReminderWorker(
     context: Context,
     workerParams: WorkerParameters
@@ -29,6 +33,9 @@ class CourseReminderWorker(
         private const val WORK_NAME = "course_reminder_check"
         private val REPEAT_INTERVAL_MINUTES = 15L
 
+        /**
+         * 调度定期检查工作
+         */
         fun schedulePeriodicCheck(context: Context) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
@@ -49,6 +56,9 @@ class CourseReminderWorker(
             Log.d(TAG, "已调度定期课程检查工作，每 ${REPEAT_INTERVAL_MINUTES} 分钟执行一次")
         }
 
+        /**
+         * 取消定期检查工作
+         */
         fun cancelPeriodicCheck(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
             Log.d(TAG, "已取消定期课程检查工作")
@@ -109,6 +119,9 @@ class CourseReminderWorker(
         }
     }
 
+    /**
+     * 获取当前周数
+     */
     private fun getCurrentWeek(): Int {
         val settingsManager = SettingsManager(applicationContext)
         val semesterStartDate = settingsManager.getSemesterStartDate()
@@ -125,15 +138,24 @@ class CourseReminderWorker(
         return week.coerceIn(1, 20)
     }
 
+    /**
+     * 获取当前星期几
+     */
     private fun getCurrentDayOfWeek(): Int {
         return Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
     }
 
+    /**
+     * 获取当前时间（小时和分钟）
+     */
     private fun getCurrentTimeSlot(): Pair<Int, Int> {
         val calendar = Calendar.getInstance()
         return Pair(calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE))
     }
 
+    /**
+     * 检查课程的单双周类型是否匹配
+     */
     private fun isWeekTypeMatched(course: Course, week: Int): Boolean {
         return when (course.weekType) {
             1 -> week % 2 == 1

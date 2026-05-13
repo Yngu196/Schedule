@@ -7,6 +7,10 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 
+/**
+ * 课程提醒前台服务
+ * 保持应用在后台活跃，确保闹钟正常工作
+ */
 class CourseReminderForegroundService : Service() {
 
     private val notificationHelper by lazy { NotificationHelper(this) }
@@ -16,6 +20,9 @@ class CourseReminderForegroundService : Service() {
         private const val NOTIFICATION_ID = 10001
         private var isServiceRunning = false
 
+        /**
+         * 启动前台服务
+         */
         fun start(context: Context) {
             val intent = Intent(context, CourseReminderForegroundService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -25,11 +32,17 @@ class CourseReminderForegroundService : Service() {
             }
         }
 
+        /**
+         * 停止前台服务
+         */
         fun stop(context: Context) {
             val intent = Intent(context, CourseReminderForegroundService::class.java)
             context.stopService(intent)
         }
 
+        /**
+         * 检查服务是否正在运行
+         */
         @Suppress("UNUSED_PARAMETER")
         fun isRunning(context: Context): Boolean {
             return isServiceRunning

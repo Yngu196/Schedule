@@ -11,12 +11,19 @@ import com.cherry.wakeupschedule.R
 import com.cherry.wakeupschedule.model.Course
 import com.cherry.wakeupschedule.service.TimeTableManager
 
+/**
+ * 课程列表适配器
+ * 用于在RecyclerView中显示课程卡片
+ */
 class CourseAdapter(
     private var courses: List<Course> = emptyList(),
     private val onCourseClick: (Course) -> Unit = {},
     private val onCourseLongClick: (Course) -> Unit = {}
 ) : RecyclerView.Adapter<CourseAdapter.CourseViewHolder>() {
 
+    /**
+     * 课程卡片ViewHolder
+     */
     class CourseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val cardView: CardView = itemView.findViewById(R.id.card_course)
         val tvCourseName: TextView = itemView.findViewById(R.id.tv_course_name)
@@ -60,6 +67,9 @@ class CourseAdapter(
 
     override fun getItemCount(): Int = courses.size
 
+    /**
+     * 更新课程列表
+     */
     fun updateCourses(newCourses: List<Course>) {
         courses = newCourses
         notifyDataSetChanged()

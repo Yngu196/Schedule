@@ -1052,46 +1052,48 @@ class MainActivity : AppCompatActivity() {
             untilCalendar.set(Calendar.MILLISECOND, 0)
 
             for (week in startWeek..endWeek) {
+                var shouldAddEvent = true
                 if (course.weekType != 0) {
                     val isOddWeek = (week - startWeek + 1) % 2 == 1
                     if ((course.weekType == 1 && !isOddWeek) || (course.weekType == 2 && isOddWeek)) {
-                        courseCalendar.add(Calendar.WEEK_OF_YEAR, 1)
-                        continue
+                        shouldAddEvent = false
                     }
                 }
 
-                val eventStart = courseCalendar.clone() as Calendar
-                eventStart.set(Calendar.HOUR_OF_DAY, startHour)
-                eventStart.set(Calendar.MINUTE, startMin)
-                eventStart.set(Calendar.SECOND, 0)
-                eventStart.set(Calendar.MILLISECOND, 0)
+                if (shouldAddEvent) {
+                    val eventStart = courseCalendar.clone() as Calendar
+                    eventStart.set(Calendar.HOUR_OF_DAY, startHour)
+                    eventStart.set(Calendar.MINUTE, startMin)
+                    eventStart.set(Calendar.SECOND, 0)
+                    eventStart.set(Calendar.MILLISECOND, 0)
 
-                val eventEnd = courseCalendar.clone() as Calendar
-                eventEnd.set(Calendar.HOUR_OF_DAY, endHour)
-                eventEnd.set(Calendar.MINUTE, endMin)
-                eventEnd.set(Calendar.SECOND, 0)
-                eventEnd.set(Calendar.MILLISECOND, 0)
+                    val eventEnd = courseCalendar.clone() as Calendar
+                    eventEnd.set(Calendar.HOUR_OF_DAY, endHour)
+                    eventEnd.set(Calendar.MINUTE, endMin)
+                    eventEnd.set(Calendar.SECOND, 0)
+                    eventEnd.set(Calendar.MILLISECOND, 0)
 
-                sb.append("BEGIN:VEVENT\n")
-                sb.append("UID:${uidPrefix}_${course.id}_${week}@schedule\n")
-                sb.append("DTSTAMP:${formatIcsDate(eventStart)}\n")
-                sb.append("DTSTART:${formatIcsDate(eventStart)}\n")
-                sb.append("DTEND:${formatIcsDate(eventEnd)}\n")
-                sb.append("SUMMARY:${escapeIcsString(course.name)}\n")
-                if (course.teacher.isNotEmpty()) {
-                    sb.append("DESCRIPTION:${escapeIcsString("教师: ${course.teacher}")}\n")
+                    sb.append("BEGIN:VEVENT\n")
+                    sb.append("UID:${uidPrefix}_${course.id}_${week}@schedule\n")
+                    sb.append("DTSTAMP:${formatIcsDate(eventStart)}\n")
+                    sb.append("DTSTART:${formatIcsDate(eventStart)}\n")
+                    sb.append("DTEND:${formatIcsDate(eventEnd)}\n")
+                    sb.append("SUMMARY:${escapeIcsString(course.name)}\n")
+                    if (course.teacher.isNotEmpty()) {
+                        sb.append("DESCRIPTION:${escapeIcsString("教师: ${course.teacher}")}\n")
+                    }
+                    if (course.classroom.isNotEmpty()) {
+                        sb.append("LOCATION:${escapeIcsString(course.classroom)}\n")
+                    }
+                    if (course.alarmEnabled) {
+                        sb.append("BEGIN:VALARM\n")
+                        sb.append("TRIGGER:-PT${course.alarmMinutesBefore}M\n")
+                        sb.append("ACTION:DISPLAY\n")
+                        sb.append("DESCRIPTION:课程提醒\n")
+                        sb.append("END:VALARM\n")
+                    }
+                    sb.append("END:VEVENT\n")
                 }
-                if (course.classroom.isNotEmpty()) {
-                    sb.append("LOCATION:${escapeIcsString(course.classroom)}\n")
-                }
-                if (course.alarmEnabled) {
-                    sb.append("BEGIN:VALARM\n")
-                    sb.append("TRIGGER:-PT${course.alarmMinutesBefore}M\n")
-                    sb.append("ACTION:DISPLAY\n")
-                    sb.append("DESCRIPTION:课程提醒\n")
-                    sb.append("END:VALARM\n")
-                }
-                sb.append("END:VEVENT\n")
 
                 courseCalendar.add(Calendar.WEEK_OF_YEAR, 1)
             }

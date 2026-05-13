@@ -8,6 +8,10 @@ import android.content.Intent
 import android.os.Build
 import java.util.Calendar
 
+/**
+ * 小组件午夜更新接收器
+ * 用于在凌晨触发小组件更新和设置第二天的闹钟
+ */
 class WidgetMidnightReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         context ?: return
@@ -22,6 +26,9 @@ class WidgetMidnightReceiver : BroadcastReceiver() {
         private const val REQUEST_CODE_MIDNIGHT = 10005
         private const val REQUEST_CODE_MIDNIGHT_BACKUP = 10007
 
+        /**
+         * 安排午夜（0点）更新闹钟
+         */
         fun scheduleMidnightUpdate(context: Context) {
             try {
                 val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -51,6 +58,10 @@ class WidgetMidnightReceiver : BroadcastReceiver() {
             }
         }
 
+        /**
+         * 安排备用更新闹钟（1点）
+         * 作为0点更新失败的备用方案
+         */
         private fun scheduleBackupUpdate(context: Context) {
             try {
                 val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager

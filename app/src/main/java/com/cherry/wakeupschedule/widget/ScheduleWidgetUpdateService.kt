@@ -10,11 +10,18 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 
+/**
+ * 小组件更新服务
+ * 用于管理小组件的定时更新
+ */
 class ScheduleWidgetUpdateService {
 
     companion object {
         private const val TAG = "ScheduleWidgetUpdate"
 
+        /**
+         * 触发所有小组件更新
+         */
         fun triggerUpdate(context: Context) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val componentName = ComponentName(context, ScheduleWidgetProvider::class.java)
@@ -35,6 +42,9 @@ class ScheduleWidgetUpdateService {
             scheduleNextUpdate(context)
         }
 
+        /**
+         * 调度下次小组件更新
+         */
         fun scheduleNextUpdate(context: Context) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, WidgetUpdateReceiver::class.java)
@@ -63,6 +73,9 @@ class ScheduleWidgetUpdateService {
             Log.d(TAG, "已调度小组件下次更新")
         }
 
+        /**
+         * 取消定时更新
+         */
         fun cancelScheduledUpdate(context: Context) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, WidgetUpdateReceiver::class.java)
@@ -80,6 +93,9 @@ class ScheduleWidgetUpdateService {
     }
 }
 
+/**
+ * 小组件更新接收器
+ */
 class WidgetUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let {
@@ -88,6 +104,10 @@ class WidgetUpdateReceiver : BroadcastReceiver() {
     }
 }
 
+/**
+ * 开机广播接收器
+ * 设备启动后恢复小组件
+ */
 class WidgetBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         if (intent?.action == Intent.ACTION_BOOT_COMPLETED) {
@@ -101,6 +121,9 @@ class WidgetBootReceiver : BroadcastReceiver() {
     }
 }
 
+/**
+ * 课程结束时更新小组件
+ */
 class WidgetCourseEndReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let {
@@ -121,6 +144,9 @@ class WidgetCourseEndReceiver : BroadcastReceiver() {
     }
 }
 
+/**
+ * 周期性更新小组件接收器
+ */
 class WidgetPeriodicUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let {
@@ -136,6 +162,9 @@ class WidgetPeriodicUpdateReceiver : BroadcastReceiver() {
     }
 }
 
+/**
+ * 最小化小组件周期性更新接收器
+ */
 class MinimalWidgetPeriodicReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let {
@@ -151,6 +180,9 @@ class MinimalWidgetPeriodicReceiver : BroadcastReceiver() {
     }
 }
 
+/**
+ * 最小化小组件课程结束更新接收器
+ */
 class MinimalWidgetCourseEndReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let {

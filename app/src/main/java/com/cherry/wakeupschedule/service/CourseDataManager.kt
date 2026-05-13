@@ -45,10 +45,16 @@ class CourseDataManager private constructor(context: Context) {
         prefs.edit().putString(KEY_COURSES, coursesJson).apply()
     }
 
+    /**
+     * 获取所有课程
+     */
     fun getAllCourses(): List<Course> {
         return _coursesFlow.value
     }
 
+    /**
+     * 获取指定周的课程
+     */
     fun getCoursesForWeek(week: Int): List<Course> {
         return _coursesFlow.value.filter { course ->
             val isInWeekRange = week in course.startWeek..course.endWeek
@@ -62,6 +68,9 @@ class CourseDataManager private constructor(context: Context) {
         }
     }
 
+    /**
+     * 添加一门课程
+     */
     @Synchronized
     fun addCourse(course: Course): Course {
         val currentCourses = _coursesFlow.value.toMutableList()
@@ -73,6 +82,9 @@ class CourseDataManager private constructor(context: Context) {
         return newCourse
     }
 
+    /**
+     * 批量添加课程
+     */
     @Synchronized
     fun addCourses(courses: List<Course>) {
         val currentCourses = _coursesFlow.value.toMutableList()
@@ -85,6 +97,9 @@ class CourseDataManager private constructor(context: Context) {
         saveCoursesToPrefs(currentCourses)
     }
 
+    /**
+     * 更新课程
+     */
     @Synchronized
     fun updateCourse(course: Course) {
         val currentCourses = _coursesFlow.value.toMutableList()
@@ -96,6 +111,9 @@ class CourseDataManager private constructor(context: Context) {
         }
     }
 
+    /**
+     * 删除课程
+     */
     @Synchronized
     fun deleteCourse(course: Course) {
         val currentCourses = _coursesFlow.value.toMutableList()
@@ -104,6 +122,9 @@ class CourseDataManager private constructor(context: Context) {
         saveCoursesToPrefs(currentCourses)
     }
 
+    /**
+     * 清空所有课程
+     */
     fun clearAllCourses() {
         synchronized(this) {
             _coursesFlow.value = emptyList()
@@ -111,6 +132,9 @@ class CourseDataManager private constructor(context: Context) {
         }
     }
 
+    /**
+     * 刷新课程数据
+     */
     fun refreshCourses() {
         loadCoursesFromPrefs()
     }

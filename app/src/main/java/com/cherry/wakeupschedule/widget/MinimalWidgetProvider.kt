@@ -16,6 +16,10 @@ import com.cherry.wakeupschedule.service.SettingsManager
 import com.cherry.wakeupschedule.service.TimeTableManager
 import java.util.Calendar
 
+/**
+ * 最小化小组件提供者
+ * 显示下课倒计时
+ */
 class MinimalWidgetProvider : AppWidgetProvider() {
 
     companion object {
@@ -24,6 +28,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         private const val WIDGET_MINIMAL_COURSE_END_REQUEST_CODE = 10006
         private const val MINIMAL_PERIODIC_UPDATE_INTERVAL = 15 * 60 * 1000L
 
+        /**
+         * 触发小组件更新
+         */
         fun triggerUpdate(context: Context) {
             val intent = Intent(context, MinimalWidgetProvider::class.java).apply {
                 action = ACTION_REFRESH
@@ -70,6 +77,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 安排周期性更新
+     */
     fun schedulePeriodicUpdate(context: Context) {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -100,6 +110,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 取消周期性更新
+     */
     private fun cancelPeriodicUpdate(context: Context) {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -116,6 +129,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 安排下一个课程结束时的更新
+     */
     private fun scheduleNextCourseEndUpdate(context: Context) {
         try {
             val calendar = Calendar.getInstance()
@@ -158,6 +174,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 取消课程结束时的更新
+     */
     private fun cancelMinimalCourseEndUpdate(context: Context) {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -173,6 +192,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 触发小组件更新
+     */
     private fun triggerWidgetUpdate(context: Context) {
         val appWidgetManager = AppWidgetManager.getInstance(context)
         val appWidgetIds = appWidgetManager.getAppWidgetIds(ComponentName(context, MinimalWidgetProvider::class.java))
@@ -181,6 +203,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 更新所有小组件
+     */
     private fun updateAllWidgets(context: Context) {
         val appWidgetManager = AppWidgetManager.getInstance(context)
         val componentName = ComponentName(context, MinimalWidgetProvider::class.java)
@@ -190,6 +215,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 更新单个小组件
+     */
     private fun updateAppWidget(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -212,6 +240,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
+    /**
+     * 更新小组件内容
+     */
     private fun updateWidgetContent(context: Context, views: RemoteViews) {
         try {
             val settingsManager = SettingsManager(context)
@@ -267,6 +298,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 获取课程开始时间（分钟）
+     */
     private fun getCourseStartMinutes(context: Context, course: com.cherry.wakeupschedule.model.Course): Int {
         return try {
             val timeTableManager = TimeTableManager.getInstance(context)
@@ -287,6 +321,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 获取课程结束时间（分钟）
+     */
     private fun getCourseEndMinutes(context: Context, course: com.cherry.wakeupschedule.model.Course): Int {
         return try {
             val timeTableManager = TimeTableManager.getInstance(context)
@@ -307,6 +344,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    /**
+     * 计算当前周
+     */
     private fun calculateCurrentWeek(settingsManager: SettingsManager): Int {
         val semesterStartDate = settingsManager.getSemesterStartDate()
         if (semesterStartDate == 0L) {
@@ -321,6 +361,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         return week.coerceIn(1, 20)
     }
 
+    /**
+     * 检查课程是否符合当前周类型
+     */
     private fun isCourseInCurrentWeekType(course: com.cherry.wakeupschedule.model.Course, currentWeek: Int): Boolean {
         return when (course.weekType) {
             0 -> true

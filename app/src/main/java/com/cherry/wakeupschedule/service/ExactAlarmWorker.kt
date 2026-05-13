@@ -15,6 +15,10 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
+/**
+ * 精确提醒Worker
+ * 使用WorkManager实现课程提醒，作为AlarmManager的备份方案
+ */
 class ExactAlarmWorker(
     context: Context,
     workerParams: WorkerParameters
@@ -28,6 +32,9 @@ class ExactAlarmWorker(
         private const val KEY_COURSE_JSON = "course_json"
         private const val KEY_COURSE_ID = "course_id"
 
+        /**
+         * 调度课程提醒
+         */
         fun scheduleReminder(context: Context, course: Course, delayMinutes: Long) {
             val courseJson = Gson().toJson(course)
 
@@ -46,6 +53,9 @@ class ExactAlarmWorker(
             Log.d(TAG, "已调度课程 ${course.name} 的精确提醒，延迟 ${delayMinutes} 分钟")
         }
 
+        /**
+         * 取消课程提醒
+         */
         fun cancelReminder(context: Context, courseId: Long) {
             WorkManager.getInstance(context).cancelAllWorkByTag("course_reminder_$courseId")
             Log.d(TAG, "已取消课程 ID=$courseId 的精确提醒")
@@ -88,12 +98,18 @@ class ExactAlarmWorker(
         }
     }
 
+    /**
+     * 检查是否需要重新调度下周的提醒
+     */
     private fun shouldReschedule(course: Course): Boolean {
         val currentWeek = getCurrentWeek()
         // 只在本学期周范围内且未超过结束周时重新调度
         return currentWeek in course.startWeek..course.endWeek
     }
 
+    /**
+     * 重新调度下周的课程提醒
+     */
     private fun rescheduleNextWeek(course: Course) {
         try {
             val calendar = Calendar.getInstance()
@@ -127,6 +143,9 @@ class ExactAlarmWorker(
         }
     }
 
+    /**
+     * 获取当前周数
+     */
     private fun getCurrentWeek(): Int {
         val settingsManager = SettingsManager(applicationContext)
         val semesterStartDate = settingsManager.getSemesterStartDate()
