@@ -827,7 +827,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialogView.findViewById<TextView>(R.id.btn_export_ics).setOnClickListener {
-            Toast.makeText(this, "导出ICS功能开发中", Toast.LENGTH_SHORT).show()
+            exportIcs()
             dialog.dismiss()
         }
 
@@ -844,11 +844,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun shareApp() {
-        val githubUrl = "https://github.com/Yngu196/Schedule"
+        val websiteUrl = "https://yngu196.github.io/Schedule/"
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("GitHub链接", githubUrl)
+        val clip = ClipData.newPlainText("应用官网", websiteUrl)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(this, "已复制 GitHub 链接", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "已复制官网链接", Toast.LENGTH_SHORT).show()
     }
 
     private fun exportBackup() {
@@ -964,6 +964,206 @@ class MainActivity : AppCompatActivity() {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(intent, "分享备份文件"))
+    }
+
+    private fun exportIcs() {
+        val courses = viewModel.courses.value
+        if (courses.isNullOrEmpty()) {
+            Toast.makeText(this, "没有课程可导出", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val timeTableManager = TimeTableManager.getInstance(this)
+            val timeSlots = timeTableManager.getTimeSlots()
+
+            val semesterStartDate = settingsManager.getSemesterStartDate()
+            if (semesterStartDate <= 0L) {
+                Toast.makeText(this, "请先设置学期开始日期", Toast.LENGTH_LONG).show()
+                return
+            }
+
+            val icsContent = generateIcsContent(courses, timeSlots, semesterStartDate)
+
+            val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+            val fileName = "schedule_${dateFormat.format(Date())}.ics"
+
+            val privateFile = File(getExternalFilesDir(null), fileName)
+            privateFile.writeText(icsContent, StandardCharsets.UTF_8)
+
+            val publicFileUri = saveIcsToPublicDownloads(fileName, icsContent)
+
+            if (publicFileUri != null) {
+                Toast.makeText(this, "ICS文件已保存到下载文件夹: $fileName", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "ICS文件已保存到: ${privateFile.absolutePath}", Toast.LENGTH_LONG).show()
+            }
+
+            shareIcsFile(privateFile)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "导出ICS失败", e)
+            Toast.makeText(this, "导出ICS失败: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun generateIcsContent(courses: List<Course>, timeSlots: List<TimeTableManager.TimeSlot>, semesterStartDate: Long): String {
+        val sb = StringBuilder()
+        val uidPrefix = "schedule_${System.currentTimeMillis()}"
+        
+        sb.append("BEGIN:VCALENDAR\n")
+        sb.append("VERSION:2.0\n")
+        sb.append("PRODID:-//Schedule//CN\n")
+        sb.append("CALSCALE:GREGORIAN\n")
+        sb.append("METHOD:PUBLISH\n")
+        sb.append("X-WR-CALNAME:课程表\n")
+        sb.append("X-WR-TIMEZONE:Asia/Shanghai\n")
+
+        val semesterStartCalendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Shanghai"))
+        semesterStartCalendar.timeInMillis = semesterStartDate
+        semesterStartCalendar.set(Calendar.HOUR_OF_DAY, 0)
+        semesterStartCalendar.set(Calendar.MINUTE, 0)
+        semesterStartCalendar.set(Calendar.SECOND, 0)
+        semesterStartCalendar.set(Calendar.MILLISECOND, 0)
+
+        courses.forEach { course ->
+            val startSlot = timeSlots.find { it.node == course.startTime }
+            val endSlot = timeSlots.find { it.node == course.endTime }
+            val startTime = startSlot?.startTime ?: "08:00"
+            val endTime = endSlot?.endTime ?: "08:45"
+
+            val startParts = startTime.split(":")
+            val endParts = endTime.split(":")
+            val startHour = startParts[0].toIntOrNull() ?: 8
+            val startMin = startParts[1].toIntOrNull() ?: 0
+            val endHour = endParts[0].toIntOrNull() ?: 8
+            val endMin = endParts[1].toIntOrNull() ?: 45
+
+            val courseCalendar = semesterStartCalendar.clone() as Calendar
+            val daysToAdd = if (course.dayOfWeek == 7) 0 else course.dayOfWeek - 1
+            courseCalendar.add(Calendar.DAY_OF_YEAR, daysToAdd)
+
+            val startWeek = course.startWeek
+            val endWeek = course.endWeek
+            val untilCalendar = courseCalendar.clone() as Calendar
+            untilCalendar.add(Calendar.WEEK_OF_YEAR, endWeek - startWeek)
+            untilCalendar.set(Calendar.HOUR_OF_DAY, endHour)
+            untilCalendar.set(Calendar.MINUTE, endMin)
+            untilCalendar.set(Calendar.SECOND, 0)
+            untilCalendar.set(Calendar.MILLISECOND, 0)
+
+            for (week in startWeek..endWeek) {
+                if (course.weekType != 0) {
+                    val isOddWeek = (week - startWeek + 1) % 2 == 1
+                    if ((course.weekType == 1 && !isOddWeek) || (course.weekType == 2 && isOddWeek)) {
+                        courseCalendar.add(Calendar.WEEK_OF_YEAR, 1)
+                        continue
+                    }
+                }
+
+                val eventStart = courseCalendar.clone() as Calendar
+                eventStart.set(Calendar.HOUR_OF_DAY, startHour)
+                eventStart.set(Calendar.MINUTE, startMin)
+                eventStart.set(Calendar.SECOND, 0)
+                eventStart.set(Calendar.MILLISECOND, 0)
+
+                val eventEnd = courseCalendar.clone() as Calendar
+                eventEnd.set(Calendar.HOUR_OF_DAY, endHour)
+                eventEnd.set(Calendar.MINUTE, endMin)
+                eventEnd.set(Calendar.SECOND, 0)
+                eventEnd.set(Calendar.MILLISECOND, 0)
+
+                sb.append("BEGIN:VEVENT\n")
+                sb.append("UID:${uidPrefix}_${course.id}_${week}@schedule\n")
+                sb.append("DTSTAMP:${formatIcsDate(eventStart)}\n")
+                sb.append("DTSTART:${formatIcsDate(eventStart)}\n")
+                sb.append("DTEND:${formatIcsDate(eventEnd)}\n")
+                sb.append("SUMMARY:${escapeIcsString(course.name)}\n")
+                if (course.teacher.isNotEmpty()) {
+                    sb.append("DESCRIPTION:${escapeIcsString("教师: ${course.teacher}")}\n")
+                }
+                if (course.classroom.isNotEmpty()) {
+                    sb.append("LOCATION:${escapeIcsString(course.classroom)}\n")
+                }
+                if (course.alarmEnabled) {
+                    sb.append("BEGIN:VALARM\n")
+                    sb.append("TRIGGER:-PT${course.alarmMinutesBefore}M\n")
+                    sb.append("ACTION:DISPLAY\n")
+                    sb.append("DESCRIPTION:课程提醒\n")
+                    sb.append("END:VALARM\n")
+                }
+                sb.append("END:VEVENT\n")
+
+                courseCalendar.add(Calendar.WEEK_OF_YEAR, 1)
+            }
+        }
+
+        sb.append("END:VCALENDAR\n")
+        return sb.toString()
+    }
+
+    private fun formatIcsDate(calendar: Calendar): String {
+        val sdf = SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        return sdf.format(calendar.time)
+    }
+
+    private fun escapeIcsString(str: String): String {
+        return str
+            .replace("\\", "\\\\")
+            .replace(";", "\\;")
+            .replace(",", "\\,")
+            .replace("\n", "\\n")
+    }
+
+    private fun saveIcsToPublicDownloads(fileName: String, content: String): android.net.Uri? {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/calendar")
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+                }
+
+                val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                uri?.let {
+                    contentResolver.openOutputStream(it)?.use { outputStream ->
+                        outputStream.write(content.toByteArray(StandardCharsets.UTF_8))
+                    }
+                    contentValues.clear()
+                    contentValues.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                    contentResolver.update(it, contentValues, null, null)
+                }
+                uri
+            } else {
+                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                val file = File(downloadsDir, fileName)
+                file.writeText(content, StandardCharsets.UTF_8)
+                androidx.core.content.FileProvider.getUriForFile(
+                    this,
+                    "${packageName}.fileprovider",
+                    file
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "保存ICS到公共目录失败", e)
+            null
+        }
+    }
+
+    private fun shareIcsFile(file: File) {
+        val fileUri = androidx.core.content.FileProvider.getUriForFile(
+            this,
+            "${packageName}.fileprovider",
+            file
+        )
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/calendar"
+            putExtra(Intent.EXTRA_STREAM, fileUri)
+            putExtra(Intent.EXTRA_SUBJECT, "课程表")
+            putExtra(Intent.EXTRA_TEXT, "这是我的课程表ICS文件，可导入到日历应用中")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(intent, "分享课程表"))
     }
 
     private fun setupObservers() {
