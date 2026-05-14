@@ -991,7 +991,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun openGitHubIssues() {
         try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Yngvau/Schedule/issues"))
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Yngu196/Schedule/issues/new"))
             startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(this, "无法打开链接，请检查网络连接", Toast.LENGTH_SHORT).show()
