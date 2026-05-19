@@ -43,6 +43,7 @@ class AlarmService(private val context: Context) {
      * @param course 要设置闹钟的课程
      */
     fun setCourseAlarm(course: Course) {
+        Log.d("CourseAlarmDebug", "setCourseAlarm called: ${course.name}, alarmEnabled: ${course.alarmEnabled}")
         // 如果课程未启用闹钟，则取消该课程的闹钟
         if (!course.alarmEnabled) {
             cancelCourseAlarm(course)
@@ -133,7 +134,7 @@ class AlarmService(private val context: Context) {
                 pendingIntent
             )
         }
-        Log.d("AlarmService", "Alarm scheduled for ${course.name} at ${calendar.time}")
+        Log.d("CourseAlarmDebug", "Alarm scheduled: ${course.name}, time: ${calendar.time}, reqCode: ${course.id.toInt()}")
     }
 
     /**
@@ -454,10 +455,12 @@ class AlarmService(private val context: Context) {
  */
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
+        Log.d("CourseAlarmDebug", "AlarmReceiver onReceive called")
         intent?.let {
             val courseName = it.getStringExtra("course_name") ?: ""
             val teacher = it.getStringExtra("course_teacher") ?: ""
             val location = it.getStringExtra("course_location") ?: ""
+            Log.d("CourseAlarmDebug", "Alarm received for course: $courseName")
 
             if (context != null && courseName.isNotEmpty()) {
                 // 创建通知渠道

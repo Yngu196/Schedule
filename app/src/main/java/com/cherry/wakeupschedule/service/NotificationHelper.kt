@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -134,9 +135,14 @@ class NotificationHelper(private val context: Context) {
      * 显示通知
      */
     fun showNotification(notificationId: Int, notification: android.app.Notification) {
+        Log.d("CourseAlarmDebug", "showNotification called with id: $notificationId")
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
             == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Log.d("CourseAlarmDebug", "Notification permission granted, showing notification")
             NotificationManagerCompat.from(context).notify(notificationId, notification)
+            Log.d("CourseAlarmDebug", "Notification shown successfully")
+        } else {
+            Log.d("CourseAlarmDebug", "Notification permission NOT granted")
         }
     }
 
