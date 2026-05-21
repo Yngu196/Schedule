@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.cherry.wakeupschedule.util.DebugLogger
 import com.cherry.wakeupschedule.MainActivity
 import com.cherry.wakeupschedule.R
 
@@ -134,15 +135,18 @@ class NotificationHelper(private val context: Context) {
     /**
      * 显示通知
      */
-    fun showNotification(notificationId: Int, notification: android.app.Notification) {
-        Log.d("CourseAlarmDebug", "showNotification called with id: $notificationId")
+    fun showNotification(notificationId: Int, notification: android.app.Notification, courseName: String = "") {
+        DebugLogger.logInfo("showNotification called with id: $notificationId")
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
             == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            Log.d("CourseAlarmDebug", "Notification permission granted, showing notification")
+            DebugLogger.logInfo("Notification permission granted, showing notification")
             NotificationManagerCompat.from(context).notify(notificationId, notification)
-            Log.d("CourseAlarmDebug", "Notification shown successfully")
+            if (courseName.isNotEmpty()) {
+                DebugLogger.logNotificationShow(courseName)
+            }
+            DebugLogger.logInfo("Notification shown successfully")
         } else {
-            Log.d("CourseAlarmDebug", "Notification permission NOT granted")
+            DebugLogger.logWarn("Notification permission NOT granted")
         }
     }
 

@@ -15,8 +15,8 @@ android {
         applicationId "com.cherry.wakeupschedule"
         minSdk 26
         targetSdk 33
-        versionCode 1469
-        versionName "1.6.11-beta1"
+        versionCode 1470
+        versionName "1.6.11-beta2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

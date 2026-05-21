@@ -41,6 +41,7 @@ import com.cherry.wakeupschedule.service.CourseDataManager
 import com.cherry.wakeupschedule.service.ImportService
 import com.cherry.wakeupschedule.service.SettingsManager
 import com.cherry.wakeupschedule.service.TimeTableManager
+import com.cherry.wakeupschedule.util.DebugLogger
 import com.cherry.wakeupschedule.viewmodel.CourseViewModel
 import com.cherry.wakeupschedule.widget.ScheduleWidgetUpdateService
 import com.cherry.wakeupschedule.service.UpdateService
@@ -99,6 +100,7 @@ class MainActivity : AppCompatActivity() {
     private val touchSlop = 8f
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        DebugLogger.init(this)
         // 在super.onCreate之前应用主题
         settingsManager = SettingsManager(this)
         applyTheme()

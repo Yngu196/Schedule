@@ -1,97 +1,126 @@
 
 package com.cherry.wakeupschedule.util
 
-import android.os.Environment
+import android.content.Context
 import android.util.Log
 import java.io.File
 import java.io.FileWriter
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 object DebugLogger {
     private const val TAG = "CourseAlarmDebug"
-    private const val LOG_FILE = "course_alarm_debug.log"
-    private var writer: FileWriter? = null
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
+    private const val LOG_FILE_NAME = "course_alarm_log.txt"
+    private const val MAX_LINES = 500
 
-    fun init(context: android.content.Context) {
-        try {
-            val logDir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "logs")
-            if (!logDir.exists()) {
-                logDir.mkdirs()
-            }
-            val logFile = File(logDir, LOG_FILE)
-            writer = FileWriter(logFile, true)
-            log("I", "=== Log system initialized ===")
-            log("I", "Device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
-            log("I", "Android: ${android.os.Build.VERSION.RELEASE}")
-        } catch (e: IOException) {
-            Log.e(TAG, "Failed to init log file", e)
-        }
-    }
+    private lateinit var appContext: Context
+    private var logFile: File? = null
 
-    fun close() {
-        try {
-            writer?.close()
-        } catch (e: IOException) {
-            Log.e(TAG, "Failed to close log", e)
-        }
+    fun init(context: Context) {
+        appContext = context.applicationContext
+        logFile = File(appContext.filesDir, LOG_FILE_NAME)
+        logInfo("DebugLogger initialized")
     }
 
     fun logInfo(message: String) {
         Log.i(TAG, message)
-        log("I", message)
+        writeLine("[INFO] $message")
     }
 
     fun logDebug(message: String) {
         Log.d(TAG, message)
-        log("D", message)
+        writeLine("[DEBUG] $message")
     }
 
     fun logWarn(message: String) {
         Log.w(TAG, message)
-        log("W", message)
+        writeLine("[WARN] $message")
     }
 
     fun logError(message: String, throwable: Throwable? = null) {
-        if (throwable != null) {
-            Log.e(TAG, message, throwable)
-        } else {
-            Log.e(TAG, message)
-        }
-        log("E", message)
-    }
-
-    fun logAlarmSet(course: String, time: Date, reqCode: Int) {
-        val msg = "ALARM_SET: $course at ${dateFormat.format(time)} (reqCode=$reqCode)"
-        Log.i(TAG, msg)
-        log("I", msg)
-    }
-
-    fun logAlarmReceive(course: String) {
-        val msg = "ALARM_RECEIVE: $course"
-        Log.i(TAG, msg)
-        log("I", msg)
-    }
-
-    fun logNotificationShow(id: Int, hasPermission: Boolean) {
-        val msg = "NOTIFICATION_SHOW: id=$id, permission=$hasPermission"
-        Log.i(TAG, msg)
-        log("I", msg)
-    }
-
-    private fun log(level: String, message: String) {
-        try {
-            writer?.apply {
-                val time = dateFormat.format(Date())
-                write("[$time] [$level] $message\n")
-                flush()
+        Log.e(TAG, message, throwable)
+        val fullMessage = StringBuilder().apply {
+            append("[ERROR] $message")
+            throwable?.let {
+                append("\n")
+                append(Log.getStackTraceString(it))
             }
-        } catch (e: IOException) {
-            Log.e(TAG, "Failed to write log", e)
+        }.toString()
+        writeLine(fullMessage)
+    }
+
+    fun logAlarmSet(courseName: String, time: Date, requestCode: Int) {
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val msg = "Alarm set: $courseName at ${sdf.format(time)}, requestCode=$requestCode"
+        Log.d(TAG, msg)
+        writeLine("[ALARM] $msg")
+    }
+
+    fun logAlarmReceive(courseName: String) {
+        val msg = "Alarm received: $courseName"
+        Log.d(TAG, msg)
+        writeLine("[ALARM] $msg")
+    }
+
+    fun logNotificationShow(courseName: String) {
+        val msg = "Notification shown: $courseName"
+        Log.d(TAG, msg)
+        writeLine("[NOTIFICATION] $msg")
+    }
+
+    fun getLogs(): String {
+        return try {
+            logFile?.let {
+                if (it.exists()) {
+                    it.readText()
+                } else {
+                    "No logs yet"
+                }
+            } ?: "Log file not initialized"
+        } catch (e: Exception) {
+            "Error reading logs: ${e.message}"
+        }
+    }
+
+    fun clearLogs() {
+        try {
+            logFile?.let {
+                if (it.exists()) {
+                    it.delete()
+                }
+            }
+            logInfo("Logs cleared")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error clearing logs", e)
+        }
+    }
+
+    private fun writeLine(message: String) {
+        try {
+            logFile?.let { file ->
+                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+                val line = "$timestamp $message\n"
+
+                val lines = if (file.exists()) {
+                    file.readLines().toMutableList()
+                } else {
+                    mutableListOf()
+                }
+
+                lines.add(line.trim())
+
+                while (lines.size > MAX_LINES) {
+                    lines.removeAt(0)
+                }
+
+                FileWriter(file, false).use { writer ->
+                    writer.write(lines.joinToString("\n"))
+                    writer.write("\n")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error writing log", e)
         }
     }
 }
-

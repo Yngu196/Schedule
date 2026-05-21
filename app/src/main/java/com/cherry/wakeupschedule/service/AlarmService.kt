@@ -12,6 +12,7 @@ import androidx.core.app.AlarmManagerCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.cherry.wakeupschedule.model.Course
+import com.cherry.wakeupschedule.util.DebugLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -134,7 +135,7 @@ class AlarmService(private val context: Context) {
                 pendingIntent
             )
         }
-        Log.d("CourseAlarmDebug", "Alarm scheduled: ${course.name}, time: ${calendar.time}, reqCode: ${course.id.toInt()}")
+        DebugLogger.logAlarmSet(course.name, calendar.time, course.id.toInt())
     }
 
     /**
@@ -455,12 +456,12 @@ class AlarmService(private val context: Context) {
  */
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
-        Log.d("CourseAlarmDebug", "AlarmReceiver onReceive called")
+        DebugLogger.logInfo("AlarmReceiver onReceive called")
         intent?.let {
             val courseName = it.getStringExtra("course_name") ?: ""
             val teacher = it.getStringExtra("course_teacher") ?: ""
             val location = it.getStringExtra("course_location") ?: ""
-            Log.d("CourseAlarmDebug", "Alarm received for course: $courseName")
+            DebugLogger.logAlarmReceive(courseName)
 
             if (context != null && courseName.isNotEmpty()) {
                 // 创建通知渠道
@@ -484,7 +485,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     notificationId = courseName.hashCode()
                 )
 
-                notificationHelper.showNotification(courseName.hashCode(), notification)
+                notificationHelper.showNotification(courseName.hashCode(), notification, courseName)
 
                 // 为下一周安排闹钟（持续性提醒）
                 if (course != null) {
