@@ -395,6 +395,17 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
+                    <!-- 课程数量显示 -->
+                    <TextView
+                        android:id="@+id/tv_today_course_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="共0节课"
+                        android:textSize="14sp"
+                        android:textColor="#999999"
+                        android:layout_marginBottom="8dp" />
+
+                    <!-- 课程列表 -->
                     <LinearLayout
                         android:id="@+id/today_courses_container"
                         android:layout_width="match_parent"
@@ -403,27 +414,36 @@
 
                     </LinearLayout>
 
+                    <!-- 空状态 -->
                     <LinearLayout
                         android:id="@+id/layout_empty_today"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
                         android:orientation="vertical"
+                        android:padding="48dp"
                         android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="96dp"
+                            android:layout_height="96dp"
+                            android:src="@drawable/ic_empty"
+                            android:alpha="0.3" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="20dp"
                             android:text="今天没有课程"
-                            android:textColor="@android:color/white"
-                            android:textSize="18sp" />
+                            android:textColor="#666666"
+                            android:textSize="16sp" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
                             android:text="好好休息吧"
-                            android:textColor="#80FFFFFF"
+                            android:textColor="#999999"
                             android:textSize="14sp" />
 
                     </LinearLayout>
@@ -447,7 +467,7 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:padding="16dp"
-                    android:background="@color/purple_500">
+                    android:background="?attr/colorPrimary">
 
                     <TextView
                         android:layout_width="0dp"
@@ -455,7 +475,7 @@
                         android:layout_weight="1"
                         android:text="课程全览"
                         android:textSize="18sp"
-                        android:textColor="@color/white"
+                        android:textColor="?attr/colorOnPrimary"
                         android:textStyle="bold"
                         android:gravity="center" />
 

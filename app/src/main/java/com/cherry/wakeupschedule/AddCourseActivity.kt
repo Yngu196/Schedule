@@ -11,11 +11,13 @@ import androidx.lifecycle.ViewModelProvider
 import com.cherry.wakeupschedule.model.Course
 import com.cherry.wakeupschedule.viewmodel.CourseViewModel
 import com.cherry.wakeupschedule.widget.ScheduleWidgetUpdateService
+import com.cherry.wakeupschedule.service.SettingsManager
 import android.graphics.drawable.GradientDrawable
 
 class AddCourseActivity : AppCompatActivity() {
 
     private lateinit var viewModel: CourseViewModel
+    private lateinit var settingsManager: SettingsManager
 
     private lateinit var etCourseName: EditText
     private lateinit var etTeacher: EditText
@@ -36,16 +38,8 @@ class AddCourseActivity : AppCompatActivity() {
     private var existingCourse: Course? = null
     private var selectedColor: Int = 0xFF6200EE.toInt()
 
-    private val courseColors = intArrayOf(
-        Color.parseColor("#E53935"), Color.parseColor("#1E88E5"), Color.parseColor("#43A047"),
-        Color.parseColor("#FDD835"), Color.parseColor("#F4511E"), Color.parseColor("#8E24AA"),
-        Color.parseColor("#D81B60"), Color.parseColor("#00ACC1"), Color.parseColor("#FFB300"),
-        Color.parseColor("#5E35B1"), Color.parseColor("#3949AB"), Color.parseColor("#039BE5"),
-        Color.parseColor("#7CB342"), Color.parseColor("#C0CA33"), Color.parseColor("#FB8C00"),
-        Color.parseColor("#AB47BC"), Color.parseColor("#E91E63"), Color.parseColor("#00897B"),
-        Color.parseColor("#5C6BC0"), Color.parseColor("#26A69A"), Color.parseColor("#66BB6A"),
-        Color.parseColor("#6D4C41"), Color.parseColor("#757575"), Color.parseColor("#546E7A")
-    )
+    private val courseColors: IntArray
+        get() = settingsManager.getCourseColors()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,6 +47,8 @@ class AddCourseActivity : AppCompatActivity() {
             setContentView(R.layout.activity_add_course)
             android.util.Log.d("AddCourseActivity", "布局设置完成")
 
+            settingsManager = SettingsManager(this)
+            
             val application = this.applicationContext as android.app.Application
             val factory = ViewModelProvider.AndroidViewModelFactory.getInstance(application)
             viewModel = ViewModelProvider(this, factory)[CourseViewModel::class.java]
@@ -61,6 +57,8 @@ class AddCourseActivity : AppCompatActivity() {
             initViews()
             setupSpinners()
             setupClickListeners()
+            // 设置默认颜色为当前主题的第一个颜色
+            selectedColor = courseColors.first()
             setupColorPicker()
             android.util.Log.d("AddCourseActivity", "视图初始化完成")
 

@@ -43,8 +43,11 @@ class SettingsManager(context: Context) {
         private const val KEY_FLOAT_BUTTON_X = "float_button_x"             // 悬浮球X位置
         private const val KEY_FLOAT_BUTTON_Y = "float_button_y"             // 悬浮球Y位置
         private const val KEY_VIEW_STATE = "view_state"                     // 视图状态（week/day/overview）
+        private const val KEY_ENABLE_UPDATE_REMIND = "enable_update_remind"  // 是否允许更新提醒
+        private const val KEY_LAST_LOG_CLEAR = "last_log_clear"            // 上次清理日志日期
 
         private const val DEFAULT_SEMESTER = "2024-2025学年 第一学期"
+        private const val DEFAULT_ENABLE_UPDATE_REMIND = true              // 默认开启更新提醒
         private const val DEFAULT_WEEK = 1                                     // 默认第1周
         private const val DEFAULT_ALARM_MINUTES = 15                           // 默认提前15分钟
         private const val DEFAULT_AUTO_SWITCH = true                           // 默认自动切换
@@ -462,42 +465,60 @@ class SettingsManager(context: Context) {
             "清新马卡龙", intArrayOf(
                 0xFFF8BBD0.toInt(), 0xFFFFCCBC.toInt(), 0xFFFFF59D.toInt(),
                 0xFFA5D6A7.toInt(), 0xFF90CAF9.toInt(), 0xFFCE93D8.toInt(),
-                0xFF80CBC4.toInt(), 0xFFBCAAA4.toInt()
+                0xFF80CBC4.toInt(), 0xFFBCAAA4.toInt(), 0xFFFFCDD2.toInt(),
+                0xFFBBDEFB.toInt(), 0xFFC8E6C9.toInt(), 0xFFFFE0B2.toInt(),
+                0xFFDCEDC8.toInt(), 0xFFFFF9C4.toInt(), 0xFFFFE082.toInt(),
+                0xFFCFD8DC.toInt()
             ), 0xFF333333.toInt(), 0xFFFFFFFF.toInt()
         ),
         ColorTheme(
             "莫兰迪低灰", intArrayOf(
                 0xFFD8C3A5.toInt(), 0xFFE0BEA2.toInt(), 0xFFA8B5A0.toInt(),
                 0xFF8FA3AD.toInt(), 0xFF9D8189.toInt(), 0xFF7D9290.toInt(),
-                0xFFC9ADA7.toInt(), 0xFFB4C7DC.toInt()
+                0xFFC9ADA7.toInt(), 0xFFB4C7DC.toInt(), 0xFFB7C8C4.toInt(),
+                0xFFD1C4E9.toInt(), 0xFFC5CAE9.toInt(), 0xFFD7CCC8.toInt(),
+                0xFFCFD8DC.toInt(), 0xFFB0BEC5.toInt(), 0xFFE0E0E0.toInt(),
+                0xFF90A4AE.toInt()
             ), 0xFF2C3E50.toInt(), 0xFF2C3E50.toInt()
         ),
         ColorTheme(
             "校园标准正色", intArrayOf(
                 0xFFE55555.toInt(), 0xFF3478DB.toInt(), 0xFF27AE60.toInt(),
                 0xFF9B59B6.toInt(), 0xFFE67E22.toInt(), 0xFFF1C40F.toInt(),
-                0xFF1ABC9C.toInt(), 0xFF607D8B.toInt()
+                0xFF1ABC9C.toInt(), 0xFF607D8B.toInt(), 0xFF00BCD4.toInt(),
+                0xFFFF9800.toInt(), 0xFF03A9F4.toInt(), 0xFF4CAF50.toInt(),
+                0xFFE91E63.toInt(), 0xFF673AB7.toInt(), 0xFFFFEB3B.toInt(),
+                0xFF795548.toInt()
             ), 0xFF000000.toInt(), 0xFFFFFFFF.toInt()
         ),
         ColorTheme(
             "冷淡极简高级", intArrayOf(
                 0xFF5C6BC0.toInt(), 0xFF26A69A.toInt(), 0xFF78909C.toInt(),
                 0xFFAB47BC.toInt(), 0xFFEF5350.toInt(), 0xFFFFA726.toInt(),
-                0xFF66BB6A.toInt(), 0xFF8D6E63.toInt()
+                0xFF66BB6A.toInt(), 0xFF8D6E63.toInt(), 0xFF42A5F5.toInt(),
+                0xFFFF7043.toInt(), 0xFF26C6DA.toInt(), 0xFF9CCC65.toInt(),
+                0xFF7E57C2.toInt(), 0xFFFFCA28.toInt(), 0xFF546E7A.toInt(),
+                0xFFEC407A.toInt()
             ), 0xFF1A1A1A.toInt(), 0xFFFFFFFF.toInt()
         ),
         ColorTheme(
             "春日治愈温柔", intArrayOf(
                 0xFFFFE6EC.toInt(), 0xFFFFF0E6.toInt(), 0xFFF9F8E6.toInt(),
                 0xFFE6F4EA.toInt(), 0xFFE6F0FF.toInt(), 0xFFF0E6FF.toInt(),
-                0xFFE6F8F5.toInt(), 0xFFF2EBE6.toInt()
+                0xFFE6F8F5.toInt(), 0xFFF2EBE6.toInt(), 0xFFFFF0F4.toInt(),
+                0xFFECF5FF.toInt(), 0xFFF0FFF4.toInt(), 0xFFFFF4E6.toInt(),
+                0xFFFAF0FF.toInt(), 0xFFE6F9FF.toInt(), 0xFFF0FFF0.toInt(),
+                0xFFFFF0F0.toInt()
             ), 0xFF444444.toInt(), 0xFF444444.toInt()
         ),
         ColorTheme(
             "暗色模式专属", intArrayOf(
                 0xFFB71C1C.toInt(), 0xFF0D47A1.toInt(), 0xFF1B5E20.toInt(),
                 0xFF4A148C.toInt(), 0xFFE65100.toInt(), 0xFF827717.toInt(),
-                0xFF00695C.toInt(), 0xFF4E342E.toInt()
+                0xFF00695C.toInt(), 0xFF4E342E.toInt(), 0xFF311B92.toInt(),
+                0xFF01579B.toInt(), 0xFF004D40.toInt(), 0xFFBF360C.toInt(),
+                0xFF1A237E.toInt(), 0xFF880E4F.toInt(), 0xFF006064.toInt(),
+                0xFF3E2723.toInt()
             ), 0xFFFFFFFF.toInt(), 0xFFFFFFFF.toInt()
         )
     )
@@ -637,5 +658,70 @@ class SettingsManager(context: Context) {
      */
     fun setViewState(state: String) {
         sharedPreferences.edit().putString(KEY_VIEW_STATE, state).apply()
+    }
+
+    // ==================== 更新提醒相关 ====================
+
+    /**
+     * 获取是否允许更新提醒
+     * @return true表示允许，false表示不允许
+     */
+    fun isUpdateRemindEnabled(): Boolean {
+        return sharedPreferences.getBoolean(KEY_ENABLE_UPDATE_REMIND, DEFAULT_ENABLE_UPDATE_REMIND)
+    }
+
+    /**
+     * 设置是否允许更新提醒
+     * @param enabled true允许，false不允许
+     */
+    fun setUpdateRemindEnabled(enabled: Boolean) {
+        sharedPreferences.edit().putBoolean(KEY_ENABLE_UPDATE_REMIND, enabled).apply()
+    }
+
+    // ==================== 日志清理相关 ====================
+
+    /**
+     * 获取上次清理日志的日期
+     * @return 上次清理的日期（格式：yyyy-MM-dd），null表示从未清理
+     */
+    fun getLastLogClearDate(): String? {
+        return sharedPreferences.getString(KEY_LAST_LOG_CLEAR, null)
+    }
+
+    /**
+     * 设置上次清理日志的日期
+     * @param date 日期字符串（格式：yyyy-MM-dd）
+     */
+    fun setLastLogClearDate(date: String) {
+        sharedPreferences.edit().putString(KEY_LAST_LOG_CLEAR, date).apply()
+    }
+
+    /**
+     * 检查是否需要清理日志（每周清理一次）
+     * @return true表示需要清理
+     */
+    fun needClearLogs(): Boolean {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        val lastClear = getLastLogClearDate() ?: return true
+        
+        // 计算两个日期之间的天数差
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        try {
+            val d1 = sdf.parse(lastClear)
+            val d2 = sdf.parse(today)
+            val diff = d2.time - d1.time
+            val days = diff / (1000 * 60 * 60 * 24)
+            return days >= 7 // 7天或更久未清理
+        } catch (e: Exception) {
+            return true
+        }
+    }
+
+    /**
+     * 标记今天已清理日志
+     */
+    fun markLogClearedToday() {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        setLastLogClearDate(today)
     }
 }

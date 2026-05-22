@@ -11,8 +11,10 @@ import android.provider.MediaStore
 import android.util.Log
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CompoundButton
 import android.widget.ImageView
 import android.widget.ListView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -60,6 +62,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var btnCheckUpdate: TextView
     private lateinit var btnPermissionGuide: TextView
     private lateinit var btnFeedback: TextView
+    private lateinit var switchUpdateRemind: Switch
     private lateinit var timeTableManager: TimeTableManager
     private lateinit var updateService: com.cherry.wakeupschedule.service.UpdateService
 
@@ -160,12 +163,25 @@ class SettingsActivity : AppCompatActivity() {
         btnCheckUpdate = findViewById(R.id.btn_check_update)
         btnPermissionGuide = findViewById(R.id.btn_permission_guide)
         btnFeedback = findViewById(R.id.btn_feedback)
+        switchUpdateRemind = findViewById<Switch>(R.id.switch_update_remind)
 
         // 初始化更新服务
         updateService = com.cherry.wakeupschedule.service.UpdateService(this)
     }
     
     private fun setupClickListeners() {
+        // 更新提醒开关监听器
+        switchUpdateRemind.setOnCheckedChangeListener(object : CompoundButton.OnCheckedChangeListener {
+            override fun onCheckedChanged(buttonView: CompoundButton?, isChecked: Boolean) {
+                settingsManager.setUpdateRemindEnabled(isChecked)
+                Toast.makeText(
+                    this@SettingsActivity,
+                    if (isChecked) "已开启更新提醒" else "已关闭更新提醒",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        })
+        
         btnSchoolImport.setOnClickListener {
             // 打开教务系统导入界面
             val intent = Intent(this, SchoolImportActivity::class.java)
@@ -459,6 +475,9 @@ class SettingsActivity : AppCompatActivity() {
 
         btnBackgroundSettings.text = "背景设置 - $backgroundText"
         btnAlarmSettings.text = "课前提醒 - ${if (settingsManager.isAlarmEnabled()) "开启" else "关闭"}"
+        
+        // 更新开关状态
+        switchUpdateRemind.isChecked = settingsManager.isUpdateRemindEnabled()
     }
     
     private fun showSemesterDialog() {

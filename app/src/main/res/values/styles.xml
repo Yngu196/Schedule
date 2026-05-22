@@ -7,4 +7,9 @@
         <item name="android:backgroundDimEnabled">true</item>
         <item name="android:backgroundDimAmount">0.5</item>
     </style>
+    
+    <style name="SwitchTheme" parent="Theme.AppCompat.Light">
+        <item name="colorControlActivated">#4A90E2</item>
+        <item name="colorSwitchThumbNormal">#FFFFFF</item>
+    </style>
 </resources>

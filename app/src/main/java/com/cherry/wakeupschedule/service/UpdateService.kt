@@ -42,6 +42,11 @@ class UpdateService(private val context: Context) {
     // 静默检查更新（不显示任何提示，只在新版本时弹出对话框）
     fun checkForUpdateSilently() {
         val settingsManager = SettingsManager(context)
+        // 检查是否允许更新提醒
+        if (!settingsManager.isUpdateRemindEnabled()) {
+            Log.d(TAG, "用户已关闭更新提醒，跳过检查")
+            return
+        }
         if (settingsManager.isCheckedForUpdateToday()) {
             Log.d(TAG, "今日已检查过更新，跳过")
             return

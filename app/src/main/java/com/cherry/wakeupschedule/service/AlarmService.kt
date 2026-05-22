@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import androidx.core.app.AlarmManagerCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.cherry.wakeupschedule.model.Course
@@ -120,21 +119,11 @@ class AlarmService(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 设置精确闹钟（Android 6.0及以上使用setExactAndAllowWhileIdle）
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                calendar.timeInMillis,
-                pendingIntent
-            )
-        } else {
-            AlarmManagerCompat.setExact(
-                alarmManager,
-                AlarmManager.RTC_WAKEUP,
-                calendar.timeInMillis,
-                pendingIntent
-            )
-        }
+        // 使用 setAlarmClock 确保系统将其视为高优先级闹钟，在 Doze 模式下也能触发
+        alarmManager.setAlarmClock(
+            AlarmManager.AlarmClockInfo(calendar.timeInMillis, null),
+            pendingIntent
+        )
         DebugLogger.logAlarmSet(course.name, calendar.time, course.id.toInt())
     }
 
@@ -290,20 +279,10 @@ class AlarmService(private val context: Context) {
             )
 
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } else {
-                    AlarmManagerCompat.setExact(
-                        alarmManager,
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                }
+                alarmManager.setAlarmClock(
+                    AlarmManager.AlarmClockInfo(calendar.timeInMillis, null),
+                    pendingIntent
+                )
                 DebugLogger.logInfo("每日刷新闹钟已设置：${calendar.time}")
             } catch (e: Exception) {
                 DebugLogger.logError("每日刷新闹钟设置失败", e)
@@ -439,21 +418,11 @@ class AlarmService(private val context: Context) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // 设置精确闹钟
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                AlarmManagerCompat.setExact(
-                    alarmManager,
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
+            // 使用 setAlarmClock 确保系统将其视为高优先级闹钟
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(calendar.timeInMillis, null),
+                pendingIntent
+            )
             Log.d("AlarmService", "Registered alarm for ${course.name} week $week at ${calendar.time}")
         }
     }
@@ -558,6 +527,9 @@ class AlarmReceiver : BroadcastReceiver() {
                     @Suppress("DEPRECATION")
                     it.getSerializableExtra("course") as? Course
                 }
+
+                // 先取消该课程的旧通知，避免通知堆积
+                notificationHelper.cancelNotification(courseName.hashCode())
 
                 // 构建并显示通知
                 val notification = notificationHelper.buildCourseReminderNotification(

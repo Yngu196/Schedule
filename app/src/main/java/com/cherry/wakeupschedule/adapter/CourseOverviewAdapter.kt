@@ -4,59 +4,174 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.cherry.wakeupschedule.R
 import com.cherry.wakeupschedule.model.Course
+import com.cherry.wakeupschedule.service.TimeTableManager
 
 /**
  * 课程全览适配器
- * 用于在RecyclerView中展示课程列表
+ * 按课程名称分组，合并同一课程的不同时间，直接列表显示
  */
 class CourseOverviewAdapter(
     private val context: Context,
     private val courses: List<Course>,
     private val courseColors: IntArray
-) : RecyclerView.Adapter<CourseOverviewAdapter.ViewHolder>() {
+) : RecyclerView.Adapter<CourseOverviewAdapter.ItemViewHolder>() {
 
-    // ViewHolder类，用于缓存视图引用
-    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val colorIndicator: View = view.findViewById(R.id.color_indicator)
+    // 合并后的课程数据
+    private data class MergedCourse(
+        val name: String,
+        val teacher: String,
+        val classroom: String,
+        val startWeek: Int,
+        val endWeek: Int,
+        val weekType: Int,
+        val color: Int,
+        val timeSlots: List<TimeSlot>
+    ) {
+        data class TimeSlot(
+            val dayOfWeek: Int,
+            val startTime: Int,
+            val endTime: Int
+        )
+    }
+
+    private val mergedCourses: List<MergedCourse>
+
+    private val dayNames = arrayOf("", "周一", "周二", "周三", "周四", "周五", "周六", "周日")
+    private val timeTableManager = TimeTableManager.getInstance(context)
+    private val timeSlots = timeTableManager.getTimeSlots()
+
+    init {
+        mergedCourses = mergeCourses(courses).sortedBy { it.name }
+    }
+
+    /**
+     * 合并逻辑：相同课程名称、老师、地点的合并
+     */
+    private fun mergeCourses(courses: List<Course>): List<MergedCourse> {
+        val map = mutableMapOf<String, MergedCourse>()
+        
+        courses.forEach { course ->
+            val key = "${course.name}|${course.teacher}|${course.classroom}"
+            val color = if (course.color != 0) course.color else courseColors[(course.id % courseColors.size).toInt()]
+            
+            if (map.containsKey(key)) {
+                val existing = map[key]!!
+                // 添加新的时间slot
+                val newTimeSlots = existing.timeSlots.toMutableList()
+                newTimeSlots.add(
+                    MergedCourse.TimeSlot(
+                        course.dayOfWeek,
+                        course.startTime,
+                        course.endTime
+                    )
+                )
+                // 更新周次范围
+                val newStartWeek = minOf(existing.startWeek, course.startWeek)
+                val newEndWeek = maxOf(existing.endWeek, course.endWeek)
+                map[key] = existing.copy(
+                    startWeek = newStartWeek,
+                    endWeek = newEndWeek,
+                    timeSlots = newTimeSlots.sortedWith(compareBy({ it.dayOfWeek }, { it.startTime }))
+                )
+            } else {
+                map[key] = MergedCourse(
+                    name = course.name,
+                    teacher = course.teacher,
+                    classroom = course.classroom,
+                    startWeek = course.startWeek,
+                    endWeek = course.endWeek,
+                    weekType = course.weekType,
+                    color = color,
+                    timeSlots = listOf(
+                        MergedCourse.TimeSlot(
+                            course.dayOfWeek,
+                            course.startTime,
+                            course.endTime
+                        )
+                    )
+                )
+            }
+        }
+        
+        return map.values.toList()
+    }
+
+    class ItemViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val leftBar: View = view.findViewById(R.id.color_indicator_container)
         val tvCourseName: TextView = view.findViewById(R.id.tv_course_name)
-        val tvCourseInfo: TextView = view.findViewById(R.id.tv_course_info)
-        val tvCourseWeeks: TextView = view.findViewById(R.id.tv_course_weeks)
-        val tvCourseLocation: TextView = view.findViewById(R.id.tv_course_location)
+        val tvWeekTypeBadge: TextView = view.findViewById(R.id.tv_week_type_badge)
         val tvCourseTeacher: TextView = view.findViewById(R.id.tv_course_teacher)
+        val tvCourseLocation: TextView = view.findViewById(R.id.tv_course_location)
+        val tvCourseWeeks: TextView = view.findViewById(R.id.tv_course_weeks)
+        val llTimeList: LinearLayout = view.findViewById(R.id.ll_time_list)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ItemViewHolder {
         val view = LayoutInflater.from(context).inflate(R.layout.item_course_overview, parent, false)
-        return ViewHolder(view)
+        return ItemViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val course = courses[position]
-        val color = if (course.color != 0) course.color else courseColors[(course.id % courseColors.size).toInt()]
-        holder.colorIndicator.setBackgroundColor(color)
+    override fun onBindViewHolder(holder: ItemViewHolder, position: Int) {
+        bindCourseItem(holder, mergedCourses[position])
+    }
+
+    private fun bindCourseItem(holder: ItemViewHolder, course: MergedCourse) {
+        // 左侧颜色条
+        holder.leftBar.background.setTint(course.color)
+
+        // 课程名称
         holder.tvCourseName.text = course.name
 
-        val dayNames = arrayOf("", "周一", "周二", "周三", "周四", "周五", "周六", "周日")
-        val weekTypeStr = when (course.weekType) {
-            1 -> " (单周)"
-            2 -> " (双周)"
-            else -> ""
+        // 教师
+        holder.tvCourseTeacher.text = if (course.teacher.isNotBlank()) course.teacher else "未设置教师"
+
+        // 地点
+        holder.tvCourseLocation.text = if (course.classroom.isNotBlank()) course.classroom else "未设置地点"
+
+        // 周次
+        holder.tvCourseWeeks.text = "第${course.startWeek}-${course.endWeek}周"
+
+        // 周类型标签
+        when (course.weekType) {
+            1 -> {
+                holder.tvWeekTypeBadge.text = "单周"
+                holder.tvWeekTypeBadge.visibility = View.VISIBLE
+            }
+            2 -> {
+                holder.tvWeekTypeBadge.text = "双周"
+                holder.tvWeekTypeBadge.visibility = View.VISIBLE
+            }
+            else -> {
+                holder.tvWeekTypeBadge.visibility = View.GONE
+            }
         }
-        holder.tvCourseInfo.text = "${dayNames[course.dayOfWeek]} 第${course.startTime}-${course.endTime}节$weekTypeStr"
 
-        val weekRangeStr = "第${course.startWeek}-${course.endWeek}周"
-        holder.tvCourseWeeks.text = weekRangeStr
-
-        holder.tvCourseLocation.text = if (course.classroom.isNotBlank()) course.classroom else "未设置上课地点"
-        holder.tvCourseLocation.visibility = View.VISIBLE
-
-        holder.tvCourseTeacher.text = if (course.teacher.isNotBlank()) course.teacher else "未设置老师"
-        holder.tvCourseTeacher.visibility = View.VISIBLE
+        // 时间列表
+        holder.llTimeList.removeAllViews()
+        course.timeSlots.forEach { slot ->
+            val timeView = LayoutInflater.from(context).inflate(R.layout.item_course_time, holder.llTimeList, false)
+            val tvDay = timeView.findViewById<TextView>(R.id.tv_day)
+            val tvTimeRange = timeView.findViewById<TextView>(R.id.tv_time_range)
+            
+            tvDay.text = dayNames[slot.dayOfWeek]
+            
+            val startSlot = timeSlots.find { it.node == slot.startTime }
+            val endSlot = timeSlots.find { it.node == slot.endTime }
+            val timeStr = if (startSlot != null && endSlot != null) {
+                "第${slot.startTime}-${slot.endTime}节 ${startSlot.startTime}-${endSlot.endTime}"
+            } else {
+                "第${slot.startTime}-${slot.endTime}节"
+            }
+            tvTimeRange.text = timeStr
+            
+            holder.llTimeList.addView(timeView)
+        }
     }
 
-    override fun getItemCount(): Int = courses.size
+    override fun getItemCount(): Int = mergedCourses.size
 }

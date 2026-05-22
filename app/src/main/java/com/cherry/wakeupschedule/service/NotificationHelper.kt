@@ -48,6 +48,10 @@ class NotificationHelper(private val context: Context) {
                 enableVibration(true)
                 enableLights(true)
                 setShowBadge(true)
+                setBypassDnd(true)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                }
             }
 
             val foregroundChannel = NotificationChannel(

@@ -479,19 +479,20 @@ class MainActivity : AppCompatActivity() {
     private fun setupOverviewRecyclerView() {
         val rvOverview = findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rv_overview_courses)
         
-        if (rvOverview.adapter == null) {
-            val courses = CourseDataManager.getInstance(this).getAllCourses()
-            val sortedCourses = courses.sortedWith(compareBy({ it.dayOfWeek }, { it.startTime }))
-            
-            val adapter = com.cherry.wakeupschedule.adapter.CourseOverviewAdapter(this, sortedCourses, getCourseColors())
-            rvOverview.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
-            rvOverview.adapter = adapter
-        }
+        // 每次都重新创建 adapter 以确保显示最新数据
+        val courses = CourseDataManager.getInstance(this).getAllCourses()
+        val sortedCourses = courses.sortedWith(compareBy({ it.dayOfWeek }, { it.startTime }))
+        
+        val adapter = com.cherry.wakeupschedule.adapter.CourseOverviewAdapter(this, sortedCourses, getCourseColors())
+        rvOverview.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        rvOverview.adapter = adapter
     }
 
     private fun updateTodayView() {
         val container = findViewById<LinearLayout>(R.id.today_courses_container)
         val emptyView = findViewById<LinearLayout>(R.id.layout_empty_today)
+        val tvCourseCount = findViewById<TextView>(R.id.tv_today_course_count)
+        
         container.removeAllViews()
 
         val currentDayOfWeek = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
@@ -503,6 +504,8 @@ class MainActivity : AppCompatActivity() {
             currentWeek <= course.endWeek &&
             isCourseInCurrentWeekType(course, currentWeek)
         }.sortedBy { course -> getCourseStartMinutes(course) }
+
+        tvCourseCount.text = "共${todayCourses.size}节课"
 
         if (todayCourses.isEmpty()) {
             container.visibility = View.GONE
@@ -523,12 +526,12 @@ class MainActivity : AppCompatActivity() {
         val color = getCourseColors()[colorIndex]
 
         val view = LayoutInflater.from(this).inflate(R.layout.item_today_course, null)
+        val colorIndicator = view.findViewById<View>(R.id.color_indicator)
         val tvName = view.findViewById<TextView>(R.id.tv_course_name)
         val tvTime = view.findViewById<TextView>(R.id.tv_course_time)
         val tvLocation = view.findViewById<TextView>(R.id.tv_course_location)
 
-        view.setBackgroundColor(color)
-        view.setPadding(48, 32, 48, 32)
+        colorIndicator.setBackgroundColor(color)
 
         tvName.text = course.name
         tvLocation.text = course.classroom.ifEmpty { "未设置地点" }

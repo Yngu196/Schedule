@@ -16,16 +16,35 @@ object DebugLogger {
 
     private var appContext: Context? = null
     private var logFile: File? = null
+    private var settingsManager: com.cherry.wakeupschedule.service.SettingsManager? = null
 
     /**
      * 初始化日志系统（可重复调用，已初始化时跳过）
      * 必须在 Application.onCreate() 或 BroadcastReceiver.onReceive() 中调用
      */
     fun init(context: Context) {
-        if (appContext != null && logFile != null) return
+        if (appContext != null && logFile != null && settingsManager != null) return
         appContext = context.applicationContext
         logFile = File(appContext!!.filesDir, LOG_FILE_NAME)
+        settingsManager = com.cherry.wakeupschedule.service.SettingsManager(context)
         Log.i(TAG, "DebugLogger initialized, log file: ${logFile?.absolutePath}")
+        
+        // 检查是否需要清理日志
+        checkAndClearLogsIfNeeded()
+    }
+    
+    /**
+     * 检查并清理日志（每星期自动清理一次）
+     */
+    private fun checkAndClearLogsIfNeeded() {
+        settingsManager?.let { sm ->
+            if (sm.needClearLogs()) {
+                Log.i(TAG, "开始自动清理日志...")
+                clearLogs()
+                sm.markLogClearedToday()
+                Log.i(TAG, "日志自动清理完成")
+            }
+        }
     }
 
     fun logInfo(message: String) {

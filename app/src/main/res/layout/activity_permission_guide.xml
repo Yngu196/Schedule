@@ -125,6 +125,67 @@
                 <ImageView
                     android:layout_width="48dp"
                     android:layout_height="48dp"
+                    android:src="@android:drawable/ic_lock_idle_alarm"
+                    android:backgroundTint="#FF4081" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="精确闹钟"
+                        android:textSize="16sp"
+                        android:textColor="@color/black"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="确保闹钟在Doze模式下准时触发"
+                        android:textSize="12sp"
+                        android:textColor="#888888" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_exact_alarm_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="未授权"
+                    android:textSize="14sp"
+                    android:textColor="#FF5252"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btn_exact_alarm"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="前往开启精确闹钟"
+                android:textSize="14sp"
+                android:background="@drawable/bg_toggle_button"
+                android:textColor="@android:color/white"
+                android:layout_marginBottom="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:background="@android:color/white"
+                android:layout_marginBottom="16dp"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:src="@android:drawable/ic_dialog_info"
                     android:backgroundTint="#FFB74D" />
 

@@ -122,6 +122,15 @@ object BatteryOptimizationHelper {
     }
 
     /**
+     * 检查是否开启省电模式
+     * 超级省电模式会严重影响后台应用
+     */
+    fun isPowerSaveModeEnabled(context: Context): Boolean {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return powerManager.isPowerSaveMode
+    }
+
+    /**
      * 获取设备厂商名称
      */
     fun getManufacturerName(): String {

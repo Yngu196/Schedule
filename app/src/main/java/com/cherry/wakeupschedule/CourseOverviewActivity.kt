@@ -2,22 +2,23 @@ package com.cherry.wakeupschedule
 
 import android.graphics.Color
 import android.os.Bundle
-import android.view.View
-import android.widget.ImageButton
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cherry.wakeupschedule.adapter.CourseOverviewAdapter
-import com.cherry.wakeupschedule.model.Course
 import com.cherry.wakeupschedule.service.CourseDataManager
 import com.cherry.wakeupschedule.service.SettingsManager
+import com.google.android.material.appbar.MaterialToolbar
+import java.util.Calendar
 
 class CourseOverviewActivity : AppCompatActivity() {
 
+    private lateinit var toolbar: MaterialToolbar
     private lateinit var rvCourses: RecyclerView
-    private lateinit var btnBack: ImageButton
+    private lateinit var tvSummary: TextView
+    private lateinit var tvThisWeek: TextView
     private lateinit var adapter: CourseOverviewAdapter
 
     private val courseColors = intArrayOf(
@@ -35,16 +36,41 @@ class CourseOverviewActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_course_overview)
 
+        toolbar = findViewById(R.id.toolbar)
         rvCourses = findViewById(R.id.rv_courses)
-        btnBack = findViewById(R.id.btn_back)
+        tvSummary = findViewById(R.id.tv_summary)
+        tvThisWeek = findViewById(R.id.tv_this_week)
 
-        btnBack.setOnClickListener { finish() }
+        // 设置导航按钮颜色为深色
+        toolbar.navigationIcon?.setTint(Color.parseColor("#333333"))
+        toolbar.setNavigationOnClickListener { finish() }
 
         val courses = CourseDataManager.getInstance(this).getAllCourses()
         val sortedCourses = courses.sortedWith(compareBy({ it.dayOfWeek }, { it.startTime }))
 
+        // 更新统计摘要
+        val currentWeek = getCurrentWeek()
+        val thisWeekCourses = sortedCourses.filter { course ->
+            currentWeek in (course.startWeek..course.endWeek) &&
+                    (course.weekType == 0 ||
+                            (course.weekType == 1 && currentWeek % 2 == 1) ||
+                            (course.weekType == 2 && currentWeek % 2 == 0))
+        }
+        tvSummary.text = "共 ${sortedCourses.size} 门课程"
+        tvThisWeek.text = "本周 ${thisWeekCourses.size} 门"
+
         adapter = CourseOverviewAdapter(this, sortedCourses, courseColors)
         rvCourses.layoutManager = LinearLayoutManager(this)
         rvCourses.adapter = adapter
+    }
+
+    private fun getCurrentWeek(): Int {
+        val now = Calendar.getInstance()
+        val startDate = SettingsManager(this).getSemesterStartDate()
+        if (startDate <= 0L) return now.get(Calendar.WEEK_OF_YEAR)
+
+        val diffMillis = now.timeInMillis - startDate
+        val diffDays = (diffMillis / (1000 * 60 * 60 * 24)).toInt()
+        return (diffDays / 7) + 1
     }
 }

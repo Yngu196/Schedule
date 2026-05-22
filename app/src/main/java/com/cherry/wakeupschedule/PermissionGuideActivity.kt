@@ -1,10 +1,13 @@
 package com.cherry.wakeupschedule
 
 import android.Manifest
+import android.app.AlarmManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.TextView
@@ -16,8 +19,11 @@ import com.cherry.wakeupschedule.service.BatteryOptimizationHelper
 class PermissionGuideActivity : AppCompatActivity() {
 
     private lateinit var btnBack: ImageButton
+    private lateinit var btnRefresh: ImageButton
     private lateinit var tvNotificationStatus: TextView
     private lateinit var btnNotification: Button
+    private lateinit var tvExactAlarmStatus: TextView
+    private lateinit var btnExactAlarm: Button
     private lateinit var tvBatteryStatus: TextView
     private lateinit var btnBattery: Button
     private lateinit var tvAutostartStatus: TextView
@@ -45,8 +51,11 @@ class PermissionGuideActivity : AppCompatActivity() {
 
     private fun initViews() {
         btnBack = findViewById(R.id.btn_back)
+        btnRefresh = findViewById(R.id.btn_refresh)
         tvNotificationStatus = findViewById(R.id.tv_notification_status)
         btnNotification = findViewById(R.id.btn_notification)
+        tvExactAlarmStatus = findViewById(R.id.tv_exact_alarm_status)
+        btnExactAlarm = findViewById(R.id.btn_exact_alarm)
         tvBatteryStatus = findViewById(R.id.tv_battery_status)
         btnBattery = findViewById(R.id.btn_battery)
         tvAutostartStatus = findViewById(R.id.tv_autostart_status)
@@ -59,8 +68,16 @@ class PermissionGuideActivity : AppCompatActivity() {
             finish()
         }
 
+        btnRefresh.setOnClickListener {
+            updatePermissionStatus()
+        }
+
         btnNotification.setOnClickListener {
             requestNotificationPermission()
+        }
+
+        btnExactAlarm.setOnClickListener {
+            requestExactAlarmPermission()
         }
 
         btnBattery.setOnClickListener {
@@ -95,6 +112,26 @@ class PermissionGuideActivity : AppCompatActivity() {
             btnNotification.isEnabled = false
         }
 
+        // 精确闹钟权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val hasExactAlarm = alarmManager.canScheduleExactAlarms()
+            tvExactAlarmStatus.text = if (hasExactAlarm) "已授权 ✓" else "未授权"
+            tvExactAlarmStatus.setTextColor(
+                ContextCompat.getColor(
+                    this,
+                    if (hasExactAlarm) android.R.color.holo_green_dark else android.R.color.holo_red_dark
+                )
+            )
+            btnExactAlarm.text = if (hasExactAlarm) "已授权" else "去授权"
+            btnExactAlarm.isEnabled = !hasExactAlarm
+        } else {
+            tvExactAlarmStatus.text = "Android 12 以下无需授权"
+            tvExactAlarmStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark))
+            btnExactAlarm.text = "无需授权"
+            btnExactAlarm.isEnabled = false
+        }
+
         val batteryOptimized = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(this)
         tvBatteryStatus.text = if (batteryOptimized) "已关闭 ✓" else "未关闭"
         tvBatteryStatus.setTextColor(
@@ -121,7 +158,37 @@ class PermissionGuideActivity : AppCompatActivity() {
     private fun updateInstructions() {
         val manufacturer = BatteryOptimizationHelper.getManufacturerName()
         val instructions = BatteryOptimizationHelper.getDetailedInstructions(this)
-        tvInstructions.text = "${getManufacturerChineseName(manufacturer)} 系统设置教程：\n\n$instructions"
+
+        // 构建闹钟状态汇总
+        val summaryParts = mutableListOf<String>()
+
+        // 通知权限
+        val hasNotification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else true
+        summaryParts.add("通知权限: ${if (hasNotification) "✓" else "✗"}")
+
+        // 精确闹钟
+        val hasExactAlarm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(Context.ALARM_SERVICE) as AlarmManager).canScheduleExactAlarms()
+        } else true
+        summaryParts.add("精确闹钟: ${if (hasExactAlarm) "✓" else "✗"}")
+
+        // 电池优化
+        val batteryOptimized = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(this)
+        summaryParts.add("电池优化: ${if (batteryOptimized) "已关闭 ✓" else "未关闭 ✗"}")
+
+        // 省电模式
+        if (BatteryOptimizationHelper.isPowerSaveModeEnabled(this)) {
+            summaryParts.add("省电模式: 已开启 ✗ (建议关闭)")
+        } else {
+            summaryParts.add("省电模式: 已关闭 ✓")
+        }
+
+        val summary = "闹钟状态检查:\n${summaryParts.joinToString("\n")}\n\n" +
+                "${getManufacturerChineseName(manufacturer)} 系统设置教程：\n\n$instructions"
+
+        tvInstructions.text = summary
     }
 
     private fun getManufacturerChineseName(manufacturer: String): String {
@@ -149,6 +216,17 @@ class PermissionGuideActivity : AppCompatActivity() {
                     arrayOf(Manifest.permission.POST_NOTIFICATIONS),
                     REQUEST_NOTIFICATION_PERMISSION
                 )
+            }
+        }
+    }
+
+    private fun requestExactAlarmPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = android.net.Uri.parse("package:$packageName")
+                })
+            } catch (_: Exception) {
             }
         }
     }

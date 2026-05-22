@@ -421,6 +421,32 @@
                     android:textColor="@android:color/white"
                     android:layout_marginBottom="16dp" />
 
+                <!-- 更新提醒开关 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="12dp"
+                    android:background="@drawable/bg_button_outline"
+                    android:layout_marginBottom="12dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="接收更新提醒"
+                        android:textSize="15sp"
+                        android:textColor="@android:color/white" />
+
+                    <Switch
+                        android:id="@+id/switch_update_remind"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:theme="@style/SwitchTheme" />
+
+                </LinearLayout>
+
                 <TextView
                     android:id="@+id/btn_check_update"
                     android:layout_width="match_parent"

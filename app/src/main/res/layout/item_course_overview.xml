@@ -3,75 +3,154 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="2dp">
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="8dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="4dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp">
+        android:orientation="horizontal">
 
+        <!-- 左侧颜色条 -->
         <View
-            android:id="@+id/color_indicator"
-            android:layout_width="4dp"
+            android:id="@+id/color_indicator_container"
+            android:layout_width="10dp"
             android:layout_height="match_parent"
-            android:background="@color/purple_500" />
+            android:background="@drawable/bg_course_color_indicator" />
 
+        <!-- 右侧内容 -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:orientation="vertical"
-            android:layout_marginStart="12dp">
+            android:padding="16dp">
 
-            <TextView
-                android:id="@+id/tv_course_name"
+            <!-- 课程名称和周次标签 -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="课程名称"
-                android:textSize="16sp"
-                android:textColor="#333333"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <TextView
-                android:id="@+id/tv_course_info"
+                <TextView
+                    android:id="@+id/tv_course_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="课程名称"
+                    android:textSize="18sp"
+                    android:textColor="#333333"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_week_type_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:text="单周"
+                    android:textSize="12sp"
+                    android:textColor="#FFFFFF"
+                    android:background="@drawable/bg_week_type_badge"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <!-- 课程信息区域 -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="周一 第1-2节"
-                android:textSize="13sp"
-                android:textColor="#666666"
-                android:layout_marginTop="4dp" />
+                android:orientation="vertical"
+                android:layout_marginTop="12dp">
 
-            <TextView
-                android:id="@+id/tv_course_weeks"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="第1-16周"
-                android:textSize="12sp"
-                android:textColor="#888888"
-                android:layout_marginTop="2dp" />
+                <!-- 老师信息 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-            <TextView
-                android:id="@+id/tv_course_location"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="教学楼A101"
-                android:textSize="12sp"
-                android:textColor="#888888"
-                android:layout_marginTop="2dp" />
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_person"
+                        app:tint="#666666" />
 
-            <TextView
-                android:id="@+id/tv_course_teacher"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="张老师"
-                android:textSize="12sp"
-                android:textColor="#888888"
-                android:layout_marginTop="2dp" />
+                    <TextView
+                        android:id="@+id/tv_course_teacher"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="教师姓名"
+                        android:textSize="14sp"
+                        android:textColor="#666666" />
+
+                </LinearLayout>
+
+                <!-- 地点信息 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_location"
+                        app:tint="#666666" />
+
+                    <TextView
+                        android:id="@+id/tv_course_location"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="地点"
+                        android:textSize="14sp"
+                        android:textColor="#666666" />
+
+                </LinearLayout>
+
+                <!-- 周次信息 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_date_range"
+                        app:tint="#666666" />
+
+                    <TextView
+                        android:id="@+id/tv_course_weeks"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="第1-16周"
+                        android:textSize="14sp"
+                        android:textColor="#666666" />
+
+                </LinearLayout>
+
+                <!-- 时间列表 -->
+                <LinearLayout
+                    android:id="@+id/ll_time_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="8dp">
+
+                </LinearLayout>
+
+            </LinearLayout>
 
         </LinearLayout>
 
