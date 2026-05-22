@@ -14,13 +14,18 @@ object DebugLogger {
     private const val LOG_FILE_NAME = "course_alarm_log.txt"
     private const val MAX_LINES = 500
 
-    private lateinit var appContext: Context
+    private var appContext: Context? = null
     private var logFile: File? = null
 
+    /**
+     * 初始化日志系统（可重复调用，已初始化时跳过）
+     * 必须在 Application.onCreate() 或 BroadcastReceiver.onReceive() 中调用
+     */
     fun init(context: Context) {
+        if (appContext != null && logFile != null) return
         appContext = context.applicationContext
-        logFile = File(appContext.filesDir, LOG_FILE_NAME)
-        logInfo("DebugLogger initialized")
+        logFile = File(appContext!!.filesDir, LOG_FILE_NAME)
+        Log.i(TAG, "DebugLogger initialized, log file: ${logFile?.absolutePath}")
     }
 
     fun logInfo(message: String) {

@@ -251,6 +251,84 @@ class AlarmService(private val context: Context) {
         registerAllCourseNotifications()
     }
 
+    // ────────── 每日凌晨闹钟刷新（解决 vivo/OPPO 杀进程后闹钟丢失问题）──────────
+
+    companion object {
+        private const val DAILY_REFRESH_REQUEST_CODE = 99999
+        const val DAILY_REFRESH_ACTION = "com.cherry.wakeupschedule.DAILY_ALARM_REFRESH"
+
+        /**
+         * 调度每日凌晨闹钟刷新
+         * 每天凌晨 4:00 自动重新注册所有课程闹钟，
+         * 解决国产手机（vivo/OPPO/小米）杀进程后 AlarmManager 闹钟被清除的问题
+         */
+        fun scheduleDailyAlarmRefresh(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val settingsManager = SettingsManager(context)
+
+            if (!settingsManager.isAlarmEnabled()) {
+                DebugLogger.logInfo("每日刷新闹钟：课前提醒已关闭，跳过")
+                return
+            }
+
+            val calendar = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, 4)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            val intent = Intent(context, DailyAlarmReceiver::class.java).apply {
+                action = DAILY_REFRESH_ACTION
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                DAILY_REFRESH_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                } else {
+                    AlarmManagerCompat.setExact(
+                        alarmManager,
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+                DebugLogger.logInfo("每日刷新闹钟已设置：${calendar.time}")
+            } catch (e: Exception) {
+                DebugLogger.logError("每日刷新闹钟设置失败", e)
+            }
+        }
+
+        /**
+         * 取消每日凌晨闹钟刷新
+         */
+        fun cancelDailyAlarmRefresh(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val intent = Intent(context, DailyAlarmReceiver::class.java).apply {
+                action = DAILY_REFRESH_ACTION
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                DAILY_REFRESH_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+            DebugLogger.logInfo("每日刷新闹钟已取消")
+        }
+    }
+
     /**
      * 注册所有课程的通知
      * 为整个学期的每周课程安排闹钟
@@ -260,6 +338,8 @@ class AlarmService(private val context: Context) {
         val notificationManager = androidx.core.app.NotificationManagerCompat.from(context)
         notificationManager.cancelAll()
 
+        // 启动每日凌晨刷新闹钟（防止 vivo/OPPO 杀进程后闹钟丢失）
+        scheduleDailyAlarmRefresh(context)
         // 启动定期检查和前台服务
         CourseReminderWorker.schedulePeriodicCheck(context)
         scheduleForegroundServiceIfNeeded()
@@ -388,6 +468,8 @@ class AlarmService(private val context: Context) {
         }
         // 取消定期检查Worker
         CourseReminderWorker.cancelPeriodicCheck(context)
+        // 取消每日凌晨刷新闹钟
+        cancelDailyAlarmRefresh(context)
         // 停止前台服务
         stopForegroundService()
         Log.d("AlarmService", "Cancelled all reminders")
@@ -456,6 +538,7 @@ class AlarmService(private val context: Context) {
  */
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
+        context?.let { DebugLogger.init(it) }
         DebugLogger.logInfo("AlarmReceiver onReceive called")
         intent?.let {
             val courseName = it.getStringExtra("course_name") ?: ""
@@ -502,18 +585,49 @@ class AlarmReceiver : BroadcastReceiver() {
  */
 class BootCompletedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
+        DebugLogger.init(context)
         // 只处理开机完成广播
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
 
         // 在IO线程中恢复闹钟
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 如果闹钟启用，则恢复所有闹钟
+                // 如果闹钟启用，则恢复所有闹钟并设置每日刷新
                 if (SettingsManager(context).isAlarmEnabled()) {
                     AlarmService(context).registerAllCourseNotifications()
                 }
             } catch (e: Exception) {
                 Log.e("BootCompletedReceiver", "Failed to restore alarms after boot", e)
+            }
+        }
+    }
+}
+
+/**
+ * 每日凌晨闹钟刷新接收器
+ * 每天凌晨 4:00 自动重新注册所有课程闹钟，
+ * 解决国产手机（vivo/OPPO/小米）杀进程后 AlarmManager 闹钟被清除的问题。
+ * 用户当天无需手动打开应用即可确保课前通知正常工作。
+ */
+class DailyAlarmReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent?) {
+        DebugLogger.init(context)
+        DebugLogger.logInfo("DailyAlarmReceiver 触发：开始每日闹钟刷新")
+        if (intent?.action != AlarmService.DAILY_REFRESH_ACTION) return
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val settingsManager = SettingsManager(context)
+                if (settingsManager.isAlarmEnabled()) {
+                    val alarmService = AlarmService(context)
+                    alarmService.registerAllCourseNotifications()
+                    DebugLogger.logInfo("每日闹钟刷新完成")
+                } else {
+                    DebugLogger.logInfo("每日闹钟刷新：课前提醒已关闭，跳过")
+                }
+            } catch (e: Exception) {
+                DebugLogger.logError("每日闹钟刷新失败", e)
+                Log.e("DailyAlarmReceiver", "Failed to refresh daily alarms", e)
             }
         }
     }

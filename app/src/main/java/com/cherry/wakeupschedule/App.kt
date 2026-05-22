@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.cherry.wakeupschedule.util.DebugLogger
 import com.cherry.wakeupschedule.service.AlarmService
 import com.cherry.wakeupschedule.service.CourseDataManager
 import com.cherry.wakeupschedule.service.CourseReminderWorker
@@ -29,6 +30,9 @@ class App : Application() {
         super.onCreate()
         instance = this
         android.util.Log.d("App", "Application onCreate called")
+
+        // 初始化调试日志（在 Application 层，确保所有组件都能使用）
+        DebugLogger.init(this)
 
         try {
             NotificationHelper(this).createNotificationChannels()

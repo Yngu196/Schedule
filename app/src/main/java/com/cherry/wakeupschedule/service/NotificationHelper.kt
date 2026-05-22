@@ -20,6 +20,11 @@ import com.cherry.wakeupschedule.R
  */
 class NotificationHelper(private val context: Context) {
 
+    init {
+        // 确保 DebugLogger 在 receiver 冷启动时也能正常工作
+        DebugLogger.init(context)
+    }
+
     companion object {
         const val CHANNEL_ID = "course_reminder"
         const val CHANNEL_NAME = "课程提醒"
