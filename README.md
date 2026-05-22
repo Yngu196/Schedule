@@ -47,7 +47,7 @@
 
 - **语言**: Kotlin
 - **最低 SDK**: Android 8.0 (API 26)
-- **目标 SDK**: Android 33
+- **目标 SDK**: Android 35
 - **架构**: MVVM
 - **主要依赖**:
   - AndroidX
@@ -83,6 +83,26 @@ app/src/main/
 ```
 
 ## 更新日志
+
+### v1.6.11
+
+**通知稳定性全面优化**
+
+- **闹钟稳定性提升**：使用 `setAlarmClock()` 替代 `setExactAndAllowWhileIdle()`，在系统限制下更可靠地唤醒闹钟
+- **通知优化**：添加 `setBypassDnd(true)` 绕过勿扰模式，设置 `lockscreenVisibility` 在锁屏显示
+- **时区与时间变更响应**：监听时区和时间变更，自动重新计算所有闹钟
+- **API 35 适配**：升级 targetSdk 至 35，添加 `FOREGROUND_SERVICE_DATA_SYNC` 权限和 `windowOptOutEdgeToEdgeEnforcement` 属性
+
+**新增功能**
+
+- **每周自动清理日志**：防止日志文件过大，自动清理旧日志
+- **更新提醒开关**：在设置页面可选择是否接收更新提醒（默认开启）
+
+**界面优化**
+
+- **课程全览重构**：完全重新设计，合并相同课程，直接显示列表，移除按周分组
+- **今日视图优化**：卡片式布局，信息更清晰
+- **状态栏适配**：优化全屏状态下状态栏显示
 
 ### v1.6.10
 
