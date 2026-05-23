@@ -53,7 +53,6 @@ class AlarmService(private val context: Context) {
         // 先取消旧闹钟，避免重复
         cancelCourseAlarm(course)
 
-        val calendar = Calendar.getInstance()
         val currentWeek = getCurrentWeek()
 
         // 检查课程是否在当前周范围内
@@ -61,47 +60,15 @@ class AlarmService(private val context: Context) {
         // 检查单双周是否匹配
         if (!isWeekTypeMatched(course, currentWeek)) return
 
-        // 设置为课程所在星期（注意：Calendar.SUNDAY=1, Calendar.MONDAY=2, ..., Calendar.SATURDAY=7）
-        // 而我们的课程 dayOfWeek 是 1=周一，7=周日
-        val calendarDayOfWeek = when (course.dayOfWeek) {
-            1 -> Calendar.MONDAY
-            2 -> Calendar.TUESDAY
-            3 -> Calendar.WEDNESDAY
-            4 -> Calendar.THURSDAY
-            5 -> Calendar.FRIDAY
-            6 -> Calendar.SATURDAY
-            7 -> Calendar.SUNDAY
-            else -> Calendar.MONDAY
-        }
-        calendar.set(Calendar.DAY_OF_WEEK, calendarDayOfWeek)
+        // 使用学期开始日期精确计算闹钟时间
+        var alarmTime = calculateAlarmTimeMillis(course, currentWeek, course.alarmMinutesBefore)
 
-        // 获取课程时间段的开始时间
-        val timeSlots = timeTableManager.getTimeSlots()
-        val timeSlot = timeSlots.find { it.node == course.startTime }
-
-        if (timeSlot != null) {
-            // 使用自定义时间段
-            val timeParts = timeSlot.startTime.split(":")
-            if (timeParts.size == 2) {
-                val startHour = timeParts[0].toInt()
-                val startMinute = timeParts[1].toInt()
-                calendar.set(Calendar.HOUR_OF_DAY, startHour)
-                calendar.set(Calendar.MINUTE, startMinute - course.alarmMinutesBefore)
-            }
-        } else {
-            // 使用默认计算（每节课45分钟，从第1节8:00开始）
-            val startHour = 8 + (course.startTime - 1) * 45 / 60
-            val startMinute = (course.startTime - 1) * 45 % 60
-            calendar.set(Calendar.HOUR_OF_DAY, startHour)
-            calendar.set(Calendar.MINUTE, startMinute - course.alarmMinutesBefore)
+        // 如果设置的时间已过，则改为下周
+        if (alarmTime <= System.currentTimeMillis()) {
+            alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
         }
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
 
-        // 如果设置的时间已过，则添加到下周
-        if (calendar.timeInMillis <= System.currentTimeMillis()) {
-            calendar.add(Calendar.DAY_OF_YEAR, 7)
-        }
+        if (alarmTime <= System.currentTimeMillis()) return
 
         // 创建广播Intent，传递给AlarmReceiver
         val intent = Intent(context, AlarmReceiver::class.java).apply {
@@ -121,10 +88,10 @@ class AlarmService(private val context: Context) {
 
         // 使用 setAlarmClock 确保系统将其视为高优先级闹钟，在 Doze 模式下也能触发
         alarmManager.setAlarmClock(
-            AlarmManager.AlarmClockInfo(calendar.timeInMillis, null),
+            AlarmManager.AlarmClockInfo(alarmTime, null),
             pendingIntent
         )
-        DebugLogger.logAlarmSet(course.name, calendar.time, course.id.toInt())
+        DebugLogger.logAlarmSet(course.name, java.util.Date(alarmTime), course.id.toInt())
     }
 
     /**
@@ -177,54 +144,24 @@ class AlarmService(private val context: Context) {
         // 先取消旧提醒
         cancelCourseAlarm(course)
 
-        val calendar = Calendar.getInstance()
         val currentWeek = getCurrentWeek()
 
         // 检查周范围和单双周
         if (currentWeek < course.startWeek || currentWeek > course.endWeek) return
         if (!isWeekTypeMatched(course, currentWeek)) return
 
-        // 设置课程日期和时间（注意：Calendar.SUNDAY=1, Calendar.MONDAY=2, ..., Calendar.SATURDAY=7）
-        val calendarDayOfWeek = when (course.dayOfWeek) {
-            1 -> Calendar.MONDAY
-            2 -> Calendar.TUESDAY
-            3 -> Calendar.WEDNESDAY
-            4 -> Calendar.THURSDAY
-            5 -> Calendar.FRIDAY
-            6 -> Calendar.SATURDAY
-            7 -> Calendar.SUNDAY
-            else -> Calendar.MONDAY
-        }
-        calendar.set(Calendar.DAY_OF_WEEK, calendarDayOfWeek)
-
-        val timeSlots = timeTableManager.getTimeSlots()
-        val timeSlot = timeSlots.find { it.node == course.startTime }
-
-        if (timeSlot != null) {
-            val timeParts = timeSlot.startTime.split(":")
-            if (timeParts.size == 2) {
-                val startHour = timeParts[0].toInt()
-                val startMinute = timeParts[1].toInt()
-                calendar.set(Calendar.HOUR_OF_DAY, startHour)
-                calendar.set(Calendar.MINUTE, startMinute - course.alarmMinutesBefore)
-            }
-        } else {
-            val startHour = 8 + (course.startTime - 1) * 45 / 60
-            val startMinute = (course.startTime - 1) * 45 % 60
-            calendar.set(Calendar.HOUR_OF_DAY, startHour)
-            calendar.set(Calendar.MINUTE, startMinute - course.alarmMinutesBefore)
-        }
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
+        // 使用学期开始日期精确计算闹钟时间
+        var alarmTime = calculateAlarmTimeMillis(course, currentWeek, course.alarmMinutesBefore)
 
         // 如果时间已过，则安排到下周
-        if (calendar.timeInMillis <= System.currentTimeMillis()) {
-            calendar.add(Calendar.DAY_OF_YEAR, 7)
+        if (alarmTime <= System.currentTimeMillis()) {
+            alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
         }
 
+        if (alarmTime <= System.currentTimeMillis()) return
+
         // 计算延迟时间（分钟）
-        val now = System.currentTimeMillis()
-        val delayMillis = calendar.timeInMillis - now
+        val delayMillis = alarmTime - System.currentTimeMillis()
         val delayMinutes = (delayMillis / (1000 * 60)).coerceAtLeast(1)
 
         // 使用WorkManager安排提醒
@@ -347,57 +284,24 @@ class AlarmService(private val context: Context) {
      * @param semesterEndWeek 学期结束周
      */
     private fun registerCourseNotificationsForSemester(course: Course, semesterEndWeek: Int) {
+        val currentWeek = getCurrentWeek()
+
         // 遍历课程的周数范围
         for (week in course.startWeek..Math.min(course.endWeek, semesterEndWeek)) {
             // 检查单双周
             if (!isWeekTypeMatched(course, week)) continue
 
-            val calendar = Calendar.getInstance()
-            // 设置为课程所在星期（注意：Calendar.SUNDAY=1, Calendar.MONDAY=2, ..., Calendar.SATURDAY=7）
-            // 而我们的课程 dayOfWeek 是 1=周一，7=周日
-            val calendarDayOfWeek = when (course.dayOfWeek) {
-                1 -> Calendar.MONDAY
-                2 -> Calendar.TUESDAY
-                3 -> Calendar.WEDNESDAY
-                4 -> Calendar.THURSDAY
-                5 -> Calendar.FRIDAY
-                6 -> Calendar.SATURDAY
-                7 -> Calendar.SUNDAY
-                else -> Calendar.MONDAY
-            }
-            calendar.set(Calendar.DAY_OF_WEEK, calendarDayOfWeek)
+            // 使用学期开始日期精确计算闹钟时间
+            var alarmTime = calculateAlarmTimeMillis(course, week, course.alarmMinutesBefore)
 
-            val timeSlots = timeTableManager.getTimeSlots()
-            val timeSlot = timeSlots.find { it.node == course.startTime }
-
-            // 设置课程时间
-            if (timeSlot != null) {
-                val timeParts = timeSlot.startTime.split(":")
-                if (timeParts.size == 2) {
-                    val startHour = timeParts[0].toInt()
-                    val startMinute = timeParts[1].toInt()
-                    calendar.set(Calendar.HOUR_OF_DAY, startHour)
-                    calendar.set(Calendar.MINUTE, startMinute - course.alarmMinutesBefore)
+            // 如果时间已过且是当前周，改为下周
+            if (alarmTime <= System.currentTimeMillis()) {
+                if (week == currentWeek) {
+                    alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
+                    if (alarmTime <= System.currentTimeMillis()) continue
+                } else {
+                    continue
                 }
-            } else {
-                val startHour = 8 + (course.startTime - 1) * 45 / 60
-                val startMinute = (course.startTime - 1) * 45 % 60
-                calendar.set(Calendar.HOUR_OF_DAY, startHour)
-                calendar.set(Calendar.MINUTE, startMinute - course.alarmMinutesBefore)
-            }
-            calendar.set(Calendar.SECOND, 0)
-            calendar.set(Calendar.MILLISECOND, 0)
-
-            // 计算日期差（更可靠的方法）
-            val currentWeek = getCurrentWeek()
-            val weekDiff = week - currentWeek
-            if (weekDiff != 0) {
-                calendar.add(Calendar.DAY_OF_YEAR, weekDiff * 7)
-            }
-
-            // 跳过已过去的时间
-            if (calendar.timeInMillis <= System.currentTimeMillis()) {
-                continue
             }
 
             // 创建通知Intent
@@ -420,10 +324,10 @@ class AlarmService(private val context: Context) {
 
             // 使用 setAlarmClock 确保系统将其视为高优先级闹钟
             alarmManager.setAlarmClock(
-                AlarmManager.AlarmClockInfo(calendar.timeInMillis, null),
+                AlarmManager.AlarmClockInfo(alarmTime, null),
                 pendingIntent
             )
-            Log.d("AlarmService", "Registered alarm for ${course.name} week $week at ${calendar.time}")
+            Log.d("AlarmService", "Registered alarm for ${course.name} week $week at ${java.util.Date(alarmTime)}")
         }
     }
 
@@ -499,6 +403,56 @@ class AlarmService(private val context: Context) {
             else -> true          // 每周
         }
     }
+
+    /**
+     * 使用学期开始日期精确计算闹钟触发时间
+     * 用学期开始日期 + 周偏移 + 星期偏移 来计算，避免 Calendar.set(DAY_OF_WEEK) 的解析不确定性
+     *
+     * @param course 课程
+     * @param targetWeek 目标周数（1~20）
+     * @param alarmMinutesBefore 提前提醒分钟数
+     * @return 闹钟触发时间的毫秒时间戳，如果学期未设置则返回0
+     */
+    private fun calculateAlarmTimeMillis(course: Course, targetWeek: Int, alarmMinutesBefore: Int): Long {
+        val settingsManager = SettingsManager(context)
+        val semesterStart = settingsManager.getSemesterStartDate()
+        if (semesterStart == 0L) return 0L
+
+        // 学期开始日期是 Monday（周1），构造基准 Calendar
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = semesterStart
+            // 清零时间部分
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        // 移动到目标周：semesterStart + (targetWeek - 1) * 7 天
+        calendar.add(Calendar.DAY_OF_YEAR, (targetWeek - 1) * 7)
+        // 移动到目标星期 dayOfWeek：1=周一, ..., 7=周日，偏移量为 dayOfWeek-1
+        calendar.add(Calendar.DAY_OF_YEAR, course.dayOfWeek - 1)
+
+        // 设置上课开始时间
+        val timeSlots = timeTableManager.getTimeSlots()
+        val timeSlot = timeSlots.find { it.node == course.startTime }
+        if (timeSlot != null) {
+            val timeParts = timeSlot.startTime.split(":")
+            if (timeParts.size == 2) {
+                calendar.set(Calendar.HOUR_OF_DAY, timeParts[0].toInt())
+                calendar.set(Calendar.MINUTE, timeParts[1].toInt())
+            }
+        } else {
+            // 默认计算：每节课45分钟，从第1节8:00开始
+            calendar.set(Calendar.HOUR_OF_DAY, 8 + (course.startTime - 1) * 45 / 60)
+            calendar.set(Calendar.MINUTE, (course.startTime - 1) * 45 % 60)
+        }
+
+        // 减去提前提醒分钟数
+        calendar.add(Calendar.MINUTE, -alarmMinutesBefore)
+
+        return calendar.timeInMillis
+    }
 }
 
 /**
@@ -506,6 +460,13 @@ class AlarmService(private val context: Context) {
  * 当闹钟触发时接收广播并显示课程提醒通知
  */
 class AlarmReceiver : BroadcastReceiver() {
+
+    companion object {
+        // 防重复通知：记录最近通知时间戳（课程名 -> 最后通知毫秒时间戳）
+        private val lastNotificationTime = mutableMapOf<String, Long>()
+        private const val DEBOUNCE_MS = 5000L // 5秒内同一课程不再弹通知
+    }
+
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let { DebugLogger.init(it) }
         DebugLogger.logInfo("AlarmReceiver onReceive called")
@@ -516,6 +477,18 @@ class AlarmReceiver : BroadcastReceiver() {
             DebugLogger.logAlarmReceive(courseName)
 
             if (context != null && courseName.isNotEmpty()) {
+                // 防重复通知：5秒内同一课程不重复弹通知
+                val now = System.currentTimeMillis()
+                lastNotificationTime[courseName]?.let { last ->
+                    if (now - last < DEBOUNCE_MS) {
+                        DebugLogger.logWarn("跳过重复通知: $courseName (距上次 ${now - last}ms)")
+                        return
+                    }
+                }
+                lastNotificationTime[courseName] = now
+                // 清理超过1分钟的旧记录，防止 map 无限增长
+                lastNotificationTime.entries.removeAll { now - it.value > 60000 }
+
                 // 创建通知渠道
                 val notificationHelper = NotificationHelper(context)
                 notificationHelper.createNotificationChannels()
@@ -528,8 +501,10 @@ class AlarmReceiver : BroadcastReceiver() {
                     it.getSerializableExtra("course") as? Course
                 }
 
-                // 先取消该课程的旧通知，避免通知堆积
-                notificationHelper.cancelNotification(courseName.hashCode())
+                // 使用课程名+周次生成更精确的通知ID，先取消避免堆积
+                val week = it.getIntExtra("notification_week", 0)
+                val uniqueId = if (week > 0) "$courseName#$week".hashCode() else courseName.hashCode()
+                notificationHelper.cancelNotification(uniqueId)
 
                 // 构建并显示通知
                 val notification = notificationHelper.buildCourseReminderNotification(
@@ -537,14 +512,14 @@ class AlarmReceiver : BroadcastReceiver() {
                     teacher = teacher,
                     location = location,
                     minutesBefore = course?.alarmMinutesBefore ?: 15,
-                    notificationId = courseName.hashCode()
+                    notificationId = uniqueId
                 )
 
-                notificationHelper.showNotification(courseName.hashCode(), notification, courseName)
+                notificationHelper.showNotification(uniqueId, notification, courseName)
 
                 // 为下一周安排闹钟（持续性提醒）
                 if (course != null) {
-                    AlarmService(context).scheduleExactReminder(course)
+                    AlarmService(context).setCourseAlarm(course)
                 }
             }
         }

@@ -1,3 +1,45 @@
+# v1.6.12 发布说明
+
+## 📱 下载
+
+- **Debug 版本**：[Schedule-app-debug-1.6.12.apk](https://github.com/Yngu196/Schedule/releases/download/v1.6.12/Schedule-app-debug-1.6.12.apk) (34.8MB)
+- **Release 版本**：[Schedule-app-release-1.6.12.apk](https://github.com/Yngu196/Schedule/releases/download/v1.6.12/Schedule-app-release-1.6.12.apk) (28.6MB)
+
+## 🐛 紧急修复
+
+### ⚠️ 通知稳定性问题
+
+修复了真机实测发现的两个严重问题：
+
+#### 1. 通知延迟（上课十多分钟才弹通知）
+- **根因**：Calendar.set(DAY_OF_WEEK) 是脆弱的时间计算方式，解析日期不可预测，且时间已过的处理逻辑有误
+- **修复**：新增 calculateAlarmTimeMillis() 函数，改用基于学期开始日期的精确计算：
+  - 学期开始日期 + (targetWeek-1)*7 天 → 目标周周一
+  - + (dayOfWeek-1) 天 → 目标星期
+  - + 开始时间 - 提前提醒分钟数
+- **优势**：不再依赖 Calendar 的自动调整，完全可预测
+
+#### 2. 同课程出现两个通知
+- **根因**：同一课程可能有两个闹钟触发，又没有去重机制
+- **修复**：
+  - 新增时间窗口去重（5秒内同一课程不重复弹通知）
+  - 使用更精确的通知ID（课程名 + 周次）
+  - 自动清理 1分钟前的记录防止内存泄漏
+  - 通知弹出后统一调用 setCourseAlarm() 延续下一次闹钟
+
+## 📝 修改
+
+仅修改 1 个文件：
+- [AlarmService.kt](app/src/main/java/com/cherry/wakeupschedule/service/AlarmService.kt)
+
+## 📌 建议
+
+**强烈建议所有用户升级到此版本！** 特别是如果您之前遇到过：
+- 课前提醒很晚才弹（有时甚至下课后）
+- 同一课程弹出两次通知
+
+---
+
 # v1.6.11 发布说明
 
 ## 📱 下载
@@ -36,9 +78,8 @@
 ## 📋 完整修改列表
 
 ### 核心功能
-- `AlarmService.kt`：替换为 `setAlarmClock()`
+- `AlarmService.kt`：替换为 `setAlarmClock()`、时区变更监听
 - `NotificationHelper.kt`：添加绕过勿扰和锁屏显示
-- `WidgetTimeChangedReceiver.kt`：监听时区变更并重新计算闹钟
 - `DebugLogger.kt`：自动清理逻辑
 - `SettingsManager.kt`：新设置项
 - `UpdateService.kt`：更新提醒开关支持
@@ -54,16 +95,9 @@
 - `build.gradle`：SDK 和依赖版本升级
 - `AndroidManifest.xml`：新权限和接收器
 
-## 🐛 Bug 修复
-
-- 修复状态栏在主题切换时被遮挡的问题
-- 修复小组件在时区变更时可能显示不正确的问题
-- 修复课程全览在课程多时难以查看的问题
-- 修复更新检查在用户关闭更新提醒时仍然弹出的问题
-
 ## 📌 升级建议
 
-强烈建议所有用户升级到此版本，特别是遇到以下问题的用户：
+**强烈建议所有用户升级到此版本！** 特别是遇到以下问题的用户：
 - 课前提醒不稳定
 - 勿扰模式下收不到通知
 - 锁屏时没有通知
