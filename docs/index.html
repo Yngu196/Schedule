@@ -574,10 +574,19 @@
         }
 
         .footer-links span {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+            }
+            .footer-links a {
+                color: var(--primary);
+                text-decoration: none;
+                font-weight: 500;
+                transition: opacity 0.2s;
+            }
+            .footer-links a:hover {
+                opacity: 0.7;
+            }
 
         /* Responsive */
         @media (max-width: 968px) {
@@ -658,7 +667,7 @@
                     <li><a href="#screenshots">预览</a></li>
                     <li><a href="#download">下载</a></li>
                     <li><a href="https://github.com/Yngu196/Schedule" target="_blank">开源</a></li>
-                    <li><a href="#">常见问题</a></li>
+                    <li><a href="https://github.com/Yngu196/Schedule/issues" target="_blank">反馈</a></li>
                 </ul>
                 <div class="nav-cta">
                     <a href="https://github.com/Yngu196/Schedule" target="_blank" class="nav-btn nav-btn-primary">
@@ -829,6 +838,8 @@
         <div class="container">
             <div class="footer-links">
                 <span>© 2024 Schedule · 开源课表应用</span>
+                <span>·</span>
+                <span><a href="https://github.com/Yngu196/Schedule/issues" target="_blank">问题反馈</a></span>
                 <span>·</span>
                 <span>基于 Android 开发 🤖</span>
             </div>
