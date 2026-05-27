@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Schedule - 一款简洁优雅的 Android 课表应用，支持课程管理、多课表切换、桌面小组件、个性化主题等功能，开源免费。">
+    <meta name="keywords" content="Schedule,课表,Android,课程表,课表应用,课程管理,Android课表,开源课表">
+    <meta property="og:title" content="Schedule - Android 课表应用">
+    <meta property="og:description" content="一款简洁优雅的 Android 课表应用，帮助你轻松管理课程，让学习与生活井井有条。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yngu196.github.io/Schedule/">
+    <meta property="og:image" content="https://yngu196.github.io/Schedule/favicon.png">
     <title>Schedule - Android 课表应用</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <style>
@@ -10,6 +17,10 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
         }
 
         :root {
@@ -31,6 +42,29 @@
             background: linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
             min-height: 100vh;
             overflow-x: hidden;
+            opacity: 0;
+            animation: fadeIn 0.6s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .fade-section {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+
+        .fade-section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        section:not(.hero) {
+            content-visibility: auto;
+            contain-intrinsic-size: 500px;
         }
 
         /* Decorative Elements */
@@ -299,30 +333,35 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            perspective: 1000px;
         }
-
         .phone-mockup {
             position: relative;
             z-index: 2;
+            transition: box-shadow 0.4s ease;
+            will-change: transform, opacity;
         }
-
         .phone-mockup img {
             width: 100%;
             max-width: 380px;
             border-radius: 36px;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15), 0 15px 30px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.4s ease;
         }
-
         .phone-mockup-secondary {
             position: absolute;
-            right: -40px;
+            right: -60px;
             top: 50%;
-            transform: translateY(-50%) rotate(-5deg);
+            transform: translateY(-50%) rotate(-8deg);
             z-index: 1;
+            opacity: 0.85;
+            will-change: transform, opacity;
         }
-
         .phone-mockup-secondary img {
-            max-width: 280px;
+            max-width: 260px;
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 10px 20px rgba(0, 0, 0, 0.08);
+            transition: box-shadow 0.4s ease;
         }
 
         /* Features Section */
@@ -431,6 +470,56 @@
             width: 100%;
             max-width: 220px;
             border-radius: 12px;
+        }
+
+        /* Widget Preview Section */
+        .widgets {
+            padding: 80px 0;
+            background: white;
+        }
+
+        .widgets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 32px;
+            margin-top: 50px;
+            justify-items: center;
+        }
+
+        .widget-card {
+            background: var(--bg-gradient-start);
+            padding: 24px;
+            border-radius: 20px;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .widget-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 40px rgba(124, 58, 237, 0.12);
+        }
+
+        .widget-card img {
+            width: 100%;
+            max-width: 240px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        }
+
+        .widget-card h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 16px;
+            margin-bottom: 6px;
+            color: var(--text-dark);
+        }
+
+        .widget-card p {
+            font-size: 14px;
+            color: var(--text-gray);
+            line-height: 1.6;
         }
 
         /* Open Source Section */
@@ -665,6 +754,7 @@
                     <li><a href="#" class="active">首页</a></li>
                     <li><a href="#features">功能</a></li>
                     <li><a href="#screenshots">预览</a></li>
+                    <li><a href="#widgets">组件</a></li>
                     <li><a href="#download">下载</a></li>
                     <li><a href="https://github.com/Yngu196/Schedule" target="_blank">开源</a></li>
                     <li><a href="https://github.com/Yngu196/Schedule/issues" target="_blank">反馈</a></li>
@@ -742,7 +832,7 @@
         </div>
     </section>
 
-    <section class="features" id="features">
+    <section class="features fade-section" id="features">
         <div class="container">
             <div class="section-header">
                 <h2 class="section-title">功能特性</h2>
@@ -773,7 +863,7 @@
         </div>
     </section>
 
-    <section class="screenshots" id="screenshots">
+    <section class="screenshots fade-section" id="screenshots">
         <div class="container">
             <div class="section-header">
                 <h2 class="section-title">应用预览</h2>
@@ -781,16 +871,38 @@
             </div>
             <div class="screenshots-grid">
                 <div class="screenshot-card">
-                    <img src="https://github.com/Yngu196/Schedule/blob/a59162a74e781869cc81244a24210ae464f8b445/%E6%9C%AC%E5%91%A8%E8%AF%BE%E7%A8%8B%E9%A2%84%E8%A7%88%E5%9B%BE.png?raw=true" alt="周视图">
+                    <img loading="lazy" src="https://github.com/Yngu196/Schedule/blob/a59162a74e781869cc81244a24210ae464f8b445/%E6%9C%AC%E5%91%A8%E8%AF%BE%E7%A8%8B%E9%A2%84%E8%A7%88%E5%9B%BE.png?raw=true" alt="周视图">
                 </div>
                 <div class="screenshot-card">
-                    <img src="https://github.com/Yngu196/Schedule/blob/a59162a74e781869cc81244a24210ae464f8b445/%E4%BB%8A%E6%97%A5%E8%AF%BE%E7%A8%8B%E9%A2%84%E8%A7%88%E5%9B%BE.png?raw=true" alt="日视图">
+                    <img loading="lazy" src="https://github.com/Yngu196/Schedule/blob/a59162a74e781869cc81244a24210ae464f8b445/%E4%BB%8A%E6%97%A5%E8%AF%BE%E7%A8%8B%E9%A2%84%E8%A7%88%E5%9B%BE.png?raw=true" alt="日视图">
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="download-section" id="download">
+    <section class="widgets fade-section" id="widgets">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">组件预览</h2>
+                <div class="section-underline"></div>
+                <p class="section-subtitle">桌面小组件，一目了然</p>
+            </div>
+            <div class="widgets-grid">
+                <div class="widget-card">
+                    <img src="widget-today.png" alt="今日课程小组件">
+                    <h3>今日课程</h3>
+                    <p>在桌面直接查看今日课程安排，支持上下滑动查看完整课程列表</p>
+                </div>
+                <div class="widget-card">
+                    <img src="widget-countdown.png" alt="下课时间小组件">
+                    <h3>下课倒计时</h3>
+                    <p>实时显示距离下课的时间，精准掌握每节课的剩余时长</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="download-section fade-section" id="download">
         <div class="container">
             <div class="section-header">
                 <h2 class="section-title">立即下载</h2>
@@ -816,7 +928,7 @@
         </div>
     </section>
 
-    <section class="opensource">
+    <section class="opensource fade-section">
         <div class="container">
             <div class="opensource-content">
                 <div class="opensource-left">
@@ -845,5 +957,70 @@
             </div>
         </div>
     </footer>
+    <script>
+        const phonePrimary = document.querySelector('.phone-mockup');
+        const phoneSecondary = document.querySelector('.phone-mockup-secondary');
+        const maxScroll = 300;
+        const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+        const sections = document.querySelectorAll('section[id]');
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.15 });
+        
+        document.querySelectorAll('.fade-section').forEach(s => observer.observe(s));
+        
+        function updateActiveNav() {
+            let current = '';
+            sections.forEach(section => {
+                const top = section.offsetTop - 120;
+                if (window.scrollY >= top) {
+                    current = section.getAttribute('id');
+                }
+            });
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        }
+        
+        window.addEventListener('scroll', () => {
+            const scrollY = window.scrollY;
+            
+            if (phonePrimary && phoneSecondary) {
+                const progress = Math.min(scrollY / maxScroll, 1);
+                
+                const primaryX = progress * 280;
+                const primaryY = scrollY * 0.08;
+                const primaryRotate = -progress * 8;
+                const primaryScale = 1 - progress * 0.15;
+                const primaryOpacity = 1 - progress * 0.15;
+                
+                phonePrimary.style.transform = `translateX(${primaryX}px) translateY(${primaryY}px) rotate(${primaryRotate}deg) scale(${primaryScale})`;
+                phonePrimary.style.opacity = primaryOpacity;
+                phonePrimary.style.zIndex = progress > 0.5 ? '1' : '2';
+                
+                const secondaryX = -progress * 300;
+                const secondaryY = `calc(-50% + ${scrollY * -0.05}px)`;
+                const secondaryRotate = -8 + progress * 8;
+                const secondaryScale = 0.85 + progress * 0.15;
+                const secondaryOpacity = 0.85 + progress * 0.15;
+                
+                phoneSecondary.style.transform = `translateX(${secondaryX}px) translateY(${secondaryY}) rotate(${secondaryRotate}deg) scale(${secondaryScale})`;
+                phoneSecondary.style.opacity = secondaryOpacity;
+                phoneSecondary.style.zIndex = progress > 0.5 ? '2' : '1';
+            }
+            
+            updateActiveNav();
+        });
+        
+        document.querySelectorAll('svg').forEach(svg => svg.setAttribute('aria-hidden', 'true'));
+    </script>
 </body>
 </html>
