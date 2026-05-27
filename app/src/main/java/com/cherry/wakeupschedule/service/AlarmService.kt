@@ -35,6 +35,10 @@ class AlarmService(private val context: Context) {
     private val timeTableManager by lazy { TimeTableManager.getInstance(context) }
     // 懒加载通知助手
     private val notificationHelper by lazy { NotificationHelper(context) }
+    // 节假日管理器
+    private val holidayManager by lazy { HolidayManager.getInstance(context) }
+    // 设置管理器
+    private val settingsManager by lazy { SettingsManager(context) }
 
     /**
      * 设置课程闹钟
@@ -294,11 +298,29 @@ class AlarmService(private val context: Context) {
             // 使用学期开始日期精确计算闹钟时间
             var alarmTime = calculateAlarmTimeMillis(course, week, course.alarmMinutesBefore)
 
+            // 检查这一天是否是节假日，如果是且设置了隐藏，则跳过
+            if (settingsManager.isHideHolidayCourses()) {
+                val calendar = Calendar.getInstance().apply { timeInMillis = alarmTime }
+                if (holidayManager.isHoliday(calendar)) {
+                    Log.d("AlarmService", "Skipping alarm for ${course.name} on ${java.util.Date(alarmTime)} because it's a holiday")
+                    continue
+                }
+            }
+
             // 如果时间已过且是当前周，改为下周
             if (alarmTime <= System.currentTimeMillis()) {
                 if (week == currentWeek) {
                     alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
                     if (alarmTime <= System.currentTimeMillis()) continue
+
+                    // 检查下周的日期是否是节假日
+                    if (settingsManager.isHideHolidayCourses()) {
+                        val calendar = Calendar.getInstance().apply { timeInMillis = alarmTime }
+                        if (holidayManager.isHoliday(calendar)) {
+                            Log.d("AlarmService", "Skipping alarm for ${course.name} next week because it's a holiday")
+                            continue
+                        }
+                    }
                 } else {
                     continue
                 }

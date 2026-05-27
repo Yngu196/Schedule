@@ -45,8 +45,10 @@ class SettingsManager(context: Context) {
         private const val KEY_VIEW_STATE = "view_state"                     // 视图状态（week/day/overview）
         private const val KEY_ENABLE_UPDATE_REMIND = "enable_update_remind"  // 是否允许更新提醒
         private const val KEY_LAST_LOG_CLEAR = "last_log_clear"            // 上次清理日志日期
+        private const val KEY_HIDE_HOLIDAY_COURSES = "hide_holiday_courses" // 是否在节假日隐藏课程
 
         private const val DEFAULT_SEMESTER = "2024-2025学年 第一学期"
+        private const val DEFAULT_HIDE_HOLIDAY_COURSES = false              // 默认不隐藏
         private const val DEFAULT_ENABLE_UPDATE_REMIND = true              // 默认开启更新提醒
         private const val DEFAULT_WEEK = 1                                     // 默认第1周
         private const val DEFAULT_ALARM_MINUTES = 15                           // 默认提前15分钟
@@ -723,5 +725,21 @@ class SettingsManager(context: Context) {
     fun markLogClearedToday() {
         val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
         setLastLogClearDate(today)
+    }
+
+    // ==================== 节假日相关 ====================
+
+    /**
+     * 获取是否在节假日隐藏课程
+     */
+    fun isHideHolidayCourses(): Boolean {
+        return sharedPreferences.getBoolean(KEY_HIDE_HOLIDAY_COURSES, DEFAULT_HIDE_HOLIDAY_COURSES)
+    }
+
+    /**
+     * 设置是否在节假日隐藏课程
+     */
+    fun setHideHolidayCourses(hide: Boolean) {
+        sharedPreferences.edit().putBoolean(KEY_HIDE_HOLIDAY_COURSES, hide).apply()
     }
 }

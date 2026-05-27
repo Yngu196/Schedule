@@ -10,9 +10,11 @@ import com.cherry.wakeupschedule.model.Course
 import com.cherry.wakeupschedule.service.AlarmService
 import com.cherry.wakeupschedule.service.CourseDataManager
 import com.cherry.wakeupschedule.service.SettingsManager
+import com.cherry.wakeupschedule.service.HolidayManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 /**
  * 课程ViewModel
@@ -26,9 +28,21 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     private val courseDataManager = CourseDataManager.getInstance(application)
     private val settingsManager = SettingsManager(application)
+    private val holidayManager = HolidayManager.getInstance(application)
     private val alarmService = App.instance.alarmService
     @Volatile
     private var activeWeek: Int = calculateCurrentWeek()
+
+    // 计算某周第一天的日历，用于检查节假日
+    private fun getWeekStartCalendar(week: Int): Calendar? {
+        val semesterStartDate = settingsManager.getSemesterStartDate()
+        if (semesterStartDate <= 0L) return null
+        
+        return Calendar.getInstance().apply {
+            timeInMillis = semesterStartDate
+            add(Calendar.DAY_OF_YEAR, (week - 1) * 7)
+        }
+    }
 
     init {
         // 监听课程数据变化
@@ -43,7 +57,23 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                         2 -> week % 2 == 0 // 双周
                         else -> true
                     }
-                    isInWeekRange && isWeekTypeMatch
+                    if (!isInWeekRange || !isWeekTypeMatch) {
+                        return@filter false
+                    }
+                    
+                    // 检查是否需要过滤节假日课程
+                    if (settingsManager.isHideHolidayCourses()) {
+                        val weekStart = getWeekStartCalendar(week)
+                        if (weekStart != null) {
+                            val courseDayCalendar = (weekStart.clone() as Calendar).apply {
+                                add(Calendar.DAY_OF_YEAR, course.dayOfWeek - 1)
+                            }
+                            if (holidayManager.isHoliday(courseDayCalendar)) {
+                                return@filter false
+                            }
+                        }
+                    }
+                    true
                 }
                 _courses.postValue(coursesForWeek)
             }
@@ -66,7 +96,33 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     fun loadCoursesForWeek(week: Int) {
         activeWeek = week
         viewModelScope.launch {
-            val coursesForWeek = courseDataManager.getCoursesForWeek(week)
+            val allCourses = courseDataManager.getAllCourses()
+            val coursesForWeek = allCourses.filter { course ->
+                val isInWeekRange = week in course.startWeek..course.endWeek
+                val isWeekTypeMatch = when (course.weekType) {
+                    0 -> true // 每周
+                    1 -> week % 2 == 1 // 单周
+                    2 -> week % 2 == 0 // 双周
+                    else -> true
+                }
+                if (!isInWeekRange || !isWeekTypeMatch) {
+                    return@filter false
+                }
+
+                // 检查是否需要过滤节假日课程
+                if (settingsManager.isHideHolidayCourses()) {
+                    val weekStart = getWeekStartCalendar(week)
+                    if (weekStart != null) {
+                        val courseDayCalendar = (weekStart.clone() as Calendar).apply {
+                            add(Calendar.DAY_OF_YEAR, course.dayOfWeek - 1)
+                        }
+                        if (holidayManager.isHoliday(courseDayCalendar)) {
+                            return@filter false
+                        }
+                    }
+                }
+                true
+            }
             _courses.postValue(coursesForWeek)
         }
     }

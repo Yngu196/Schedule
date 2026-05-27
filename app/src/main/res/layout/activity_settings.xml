@@ -300,7 +300,33 @@
                     android:textColor="@android:color/white"
                     android:padding="12dp"
                     android:background="@drawable/bg_button_outline"
-                    android:gravity="start|center_vertical" />
+                    android:gravity="start|center_vertical"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- 节假日隐藏课程 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="12dp"
+                    android:background="@drawable/bg_button_outline">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="节假日隐藏课程"
+                        android:textSize="15sp"
+                        android:textColor="@android:color/white" />
+
+                    <Switch
+                        android:id="@+id/switch_hide_holiday_courses"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:theme="@style/SwitchTheme" />
+
+                </LinearLayout>
 
             </LinearLayout>
 

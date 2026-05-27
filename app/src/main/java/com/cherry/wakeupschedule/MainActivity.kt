@@ -569,8 +569,10 @@ class MainActivity : AppCompatActivity() {
                 val customBgPath = settingsManager.getCustomBackgroundPath()
                 if (customBgPath.isNotEmpty() && File(customBgPath).exists()) {
                     try {
-                        val bitmap = BitmapFactory.decodeFile(customBgPath)
-                        binding.ivBackground.setImageBitmap(bitmap)
+                        com.bumptech.glide.Glide.with(this@MainActivity)
+                            .load(File(customBgPath))
+                            .centerCrop()
+                            .into(binding.ivBackground)
                         binding.ivBackground.setBackgroundColor(Color.TRANSPARENT)
                         setTextColorsForCustomBackground()
                     } catch (e: Exception) {

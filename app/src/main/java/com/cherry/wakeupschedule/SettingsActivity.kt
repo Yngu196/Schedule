@@ -63,6 +63,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var btnPermissionGuide: TextView
     private lateinit var btnFeedback: TextView
     private lateinit var switchUpdateRemind: Switch
+    private lateinit var switchHideHolidayCourses: Switch
     private lateinit var timeTableManager: TimeTableManager
     private lateinit var updateService: com.cherry.wakeupschedule.service.UpdateService
     private var isUpdatingSwitchState = false
@@ -79,56 +80,12 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     // 图片选择器 - 用于选择背景图片
-    private var pendingBackgroundUri: Uri? = null
-
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { selectedUri ->
-            pendingBackgroundUri = selectedUri
-            cropImage(selectedUri)
+            saveAndProcessBackgroundImage(selectedUri)
         }
-    }
-
-    private fun cropImage(uri: Uri) {
-        try {
-            val cropIntent = Intent("com.android.camera.action.CROP").apply {
-                setDataAndType(uri, "image/*")
-                putExtra("crop", "true")
-                putExtra("aspectX", 0)
-                putExtra("aspectY", 0)
-                putExtra("outputX", 1080)
-                putExtra("outputY", 1920)
-                putExtra("scale", true)
-                putExtra("return-data", false)
-                val outputFile = File(cacheDir, "cropped_bg_${System.currentTimeMillis()}.jpg")
-                val outputUri = androidx.core.content.FileProvider.getUriForFile(
-                    this@SettingsActivity,
-                    "${packageName}.fileprovider",
-                    outputFile
-                )
-                putExtra(MediaStore.EXTRA_OUTPUT, outputUri)
-                putExtra("outputFormat", Bitmap.CompressFormat.JPEG.name)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            }
-            cropImageLauncher.launch(cropIntent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "无法裁剪图片，将使用原图", Toast.LENGTH_SHORT).show()
-            saveBackgroundImage(uri)
-        }
-    }
-
-    private val cropImageLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            val outputUri = result.data?.data ?: pendingBackgroundUri
-            outputUri?.let { saveBackgroundImage(it) }
-        } else {
-            pendingBackgroundUri?.let { saveBackgroundImage(it) }
-        }
-        pendingBackgroundUri = null
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -165,6 +122,7 @@ class SettingsActivity : AppCompatActivity() {
         btnPermissionGuide = findViewById(R.id.btn_permission_guide)
         btnFeedback = findViewById(R.id.btn_feedback)
         switchUpdateRemind = findViewById<Switch>(R.id.switch_update_remind)
+        switchHideHolidayCourses = findViewById<Switch>(R.id.switch_hide_holiday_courses)
 
         // 初始化更新服务
         updateService = com.cherry.wakeupschedule.service.UpdateService(this)
@@ -181,6 +139,21 @@ class SettingsActivity : AppCompatActivity() {
                 Toast.makeText(
                     this@SettingsActivity,
                     if (isChecked) "已开启更新提醒" else "已关闭更新提醒",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        })
+
+        // 节假日隐藏课程开关监听器
+        switchHideHolidayCourses.setOnCheckedChangeListener(object : CompoundButton.OnCheckedChangeListener {
+            override fun onCheckedChanged(buttonView: CompoundButton?, isChecked: Boolean) {
+                if (isUpdatingSwitchState) {
+                    return
+                }
+                settingsManager.setHideHolidayCourses(isChecked)
+                Toast.makeText(
+                    this@SettingsActivity,
+                    if (isChecked) "已开启节假日隐藏课程" else "已关闭节假日隐藏课程",
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -483,6 +456,7 @@ class SettingsActivity : AppCompatActivity() {
         // 更新开关状态（不触发监听器提示）
         isUpdatingSwitchState = true
         switchUpdateRemind.isChecked = settingsManager.isUpdateRemindEnabled()
+        switchHideHolidayCourses.isChecked = settingsManager.isHideHolidayCourses()
         isUpdatingSwitchState = false
     }
     
@@ -772,22 +746,29 @@ class SettingsActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun saveBackgroundImage(uri: Uri) {
+    private fun saveAndProcessBackgroundImage(uri: Uri) {
         try {
-            // 复制图片到应用私有目录
+            // 读取并处理图片
             val inputStream = contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            
+            if (bitmap == null) {
+                Toast.makeText(this, "无法读取图片", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            // 保存处理后的图片
             val fileName = "custom_bg_${System.currentTimeMillis()}.jpg"
             val file = File(filesDir, fileName)
-
-            inputStream?.use { input ->
-                FileOutputStream(file).use { output ->
-                    input.copyTo(output)
-                }
+            
+            FileOutputStream(file).use { output ->
+                // 压缩保存，质量80%
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, output)
             }
 
             // 保存路径并设置背景类型
             settingsManager.setCustomBackgroundPath(file.absolutePath)
-            settingsManager.setBackgroundThemeIndex(0)
+            settingsManager.setBackgroundTypeString("custom")
 
             // 显示预览
             showBackgroundPreview(file.absolutePath)

@@ -7,6 +7,8 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.util.Calendar
+import java.util.concurrent.TimeUnit
 
 /**
  * 课程数据管理器
@@ -16,6 +18,8 @@ class CourseDataManager private constructor(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
+    private val holidayManager = HolidayManager.getInstance(context)
+    private val settingsManager = SettingsManager(context)
 
     private val _coursesFlow = MutableStateFlow<List<Course>>(emptyList())
     val coursesFlow: StateFlow<List<Course>> = _coursesFlow
@@ -66,6 +70,61 @@ class CourseDataManager private constructor(context: Context) {
             }
             isInWeekRange && isWeekTypeMatch
         }
+    }
+
+    /**
+     * 获取指定日期的课程
+     */
+    fun getCoursesForDate(date: Calendar): List<Course> {
+        // 1. 如果设置了隐藏节假日课程，并且当天是节假日，则返回空
+        if (settingsManager.isHideHolidayCourses() && holidayManager.isHoliday(date)) {
+            return emptyList()
+        }
+
+        // 2. 计算周数
+        val week = calculateWeekNumber(date)
+        if (week <= 0) return emptyList()
+
+        // 3. 获取该周的课程
+        val coursesForWeek = getCoursesForWeek(week)
+
+        // 4. 过滤出当天的课程
+        val dayOfWeek = date.get(Calendar.DAY_OF_WEEK) - 1 // Calendar是1-7，转为0-6（周一-周日
+        val adjustedDayOfWeek = if (dayOfWeek == 0) 7 else dayOfWeek // 周日调整为7
+
+        return coursesForWeek.filter { it.dayOfWeek == adjustedDayOfWeek }
+    }
+
+    /**
+     * 计算指定日期是学期第几周
+     */
+    private fun calculateWeekNumber(date: Calendar): Int {
+        val startDate = settingsManager.getSemesterStartDate()
+        if (startDate == 0L) return -1
+
+        val startCalendar = Calendar.getInstance().apply { timeInMillis = startDate }
+
+        // 设置到当天的开始
+        startCalendar.set(Calendar.HOUR_OF_DAY, 0)
+        startCalendar.set(Calendar.MINUTE, 0)
+        startCalendar.set(Calendar.SECOND, 0)
+        startCalendar.set(Calendar.MILLISECOND, 0)
+
+        val dateCopy = (date.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        // 计算天数差
+        val diffInMillis = dateCopy.timeInMillis - startCalendar.timeInMillis
+        if (diffInMillis < 0) return -1 // 还没开学
+
+        val daysDiff = TimeUnit.DAYS.convert(diffInMillis, TimeUnit.MILLISECONDS).toInt()
+
+        // 计算周数
+        return (daysDiff / 7) + 1
     }
 
     /**
