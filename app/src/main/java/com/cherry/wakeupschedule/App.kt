@@ -91,7 +91,7 @@ class App : Application() {
                 MinimalWidgetProvider.triggerUpdate(context)
             }
         }
-        registerReceiver(timeTickReceiver, IntentFilter(Intent.ACTION_TIME_TICK))
+        registerReceiver(timeTickReceiver, IntentFilter(Intent.ACTION_TIME_TICK), RECEIVER_NOT_EXPORTED)
         Log.d("App", "TIME_TICK receiver registered dynamically for per-minute widget updates")
     }
 

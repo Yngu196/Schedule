@@ -82,6 +82,9 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+            // 先取消现有的闹钟，避免重复调度
+            alarmManager.cancel(pendingIntent)
+            // 再设置新的闹钟
             alarmManager.setInexactRepeating(
                 AlarmManager.RTC_WAKEUP,
                 System.currentTimeMillis() + PERIODIC_UPDATE_INTERVAL,
@@ -239,5 +242,5 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
         return (((System.currentTimeMillis() - startDate) / (1000 * 60 * 60 * 24)).toInt() / 7 + 1).coerceIn(1, 20)
     }
 
-    private fun isCourseInCurrentWeekType(course: com.cherry.wakeupschedule.model.Course, week: Int): Boolean = when (course.weekType) { 1 -> week % 2 == 1; 2 -> week % 2 == 0; else -> true }
+    private fun isCourseInCurrentWeekType(course: com.cherry.wakeupschedule.model.Course, week: Int): Boolean = when (course.weekType) { 0 -> true; 1 -> week % 2 == 1; 2 -> week % 2 == 0; else -> true }
 }

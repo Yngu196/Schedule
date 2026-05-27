@@ -97,7 +97,8 @@ class WebViewActivity : AppCompatActivity() {
 
         registerReceiver(
             downloadReceiver,
-            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            RECEIVER_NOT_EXPORTED
         )
     }
 

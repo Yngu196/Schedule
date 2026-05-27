@@ -90,6 +90,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+            // 先取消现有的闹钟，避免重复调度
+            alarmManager.cancel(pendingIntent)
+            // 再设置新的闹钟
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setInexactRepeating(
                     AlarmManager.RTC_WAKEUP,

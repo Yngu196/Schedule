@@ -65,6 +65,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var switchUpdateRemind: Switch
     private lateinit var timeTableManager: TimeTableManager
     private lateinit var updateService: com.cherry.wakeupschedule.service.UpdateService
+    private var isUpdatingSwitchState = false
 
     private val filePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -173,6 +174,9 @@ class SettingsActivity : AppCompatActivity() {
         // 更新提醒开关监听器
         switchUpdateRemind.setOnCheckedChangeListener(object : CompoundButton.OnCheckedChangeListener {
             override fun onCheckedChanged(buttonView: CompoundButton?, isChecked: Boolean) {
+                if (isUpdatingSwitchState) {
+                    return
+                }
                 settingsManager.setUpdateRemindEnabled(isChecked)
                 Toast.makeText(
                     this@SettingsActivity,
@@ -476,8 +480,10 @@ class SettingsActivity : AppCompatActivity() {
         btnBackgroundSettings.text = "背景设置 - $backgroundText"
         btnAlarmSettings.text = "课前提醒 - ${if (settingsManager.isAlarmEnabled()) "开启" else "关闭"}"
         
-        // 更新开关状态
+        // 更新开关状态（不触发监听器提示）
+        isUpdatingSwitchState = true
         switchUpdateRemind.isChecked = settingsManager.isUpdateRemindEnabled()
+        isUpdatingSwitchState = false
     }
     
     private fun showSemesterDialog() {

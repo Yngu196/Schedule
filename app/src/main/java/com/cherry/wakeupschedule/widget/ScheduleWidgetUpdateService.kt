@@ -24,20 +24,40 @@ class ScheduleWidgetUpdateService {
          */
         fun triggerUpdate(context: Context) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
+            
+            // 今日课程小组件
             val componentName = ComponentName(context, ScheduleWidgetProvider::class.java)
             val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-
             if (appWidgetIds.isNotEmpty()) {
                 val provider = ScheduleWidgetProvider()
                 provider.onUpdate(context, appWidgetManager, appWidgetIds)
             }
 
+            // 最小化/下课倒计时小组件
             val minimalComponentName = ComponentName(context, MinimalWidgetProvider::class.java)
             val minimalAppWidgetIds = appWidgetManager.getAppWidgetIds(minimalComponentName)
             if (minimalAppWidgetIds.isNotEmpty()) {
                 val minimalProvider = MinimalWidgetProvider()
                 minimalProvider.onUpdate(context, appWidgetManager, minimalAppWidgetIds)
             }
+
+            // 近日课程小组件
+            val upcomingDaysComponentName = ComponentName(context, UpcomingDaysWidgetProvider::class.java)
+            val upcomingDaysAppWidgetIds = appWidgetManager.getAppWidgetIds(upcomingDaysComponentName)
+            if (upcomingDaysAppWidgetIds.isNotEmpty()) {
+                val upcomingDaysProvider = UpcomingDaysWidgetProvider()
+                upcomingDaysProvider.onUpdate(context, appWidgetManager, upcomingDaysAppWidgetIds)
+            }
+
+            // 一周课程小组件（已禁用）
+            /*
+            val weekViewComponentName = ComponentName(context, WeekViewWidgetProvider::class.java)
+            val weekViewAppWidgetIds = appWidgetManager.getAppWidgetIds(weekViewComponentName)
+            if (weekViewAppWidgetIds.isNotEmpty()) {
+                val weekViewProvider = WeekViewWidgetProvider()
+                weekViewProvider.onUpdate(context, appWidgetManager, weekViewAppWidgetIds)
+            }
+            */
 
             scheduleNextUpdate(context)
         }
@@ -115,11 +135,47 @@ class WidgetBootReceiver : BroadcastReceiver() {
                 ScheduleWidgetUpdateService.triggerUpdate(it)
                 ScheduleWidgetProvider().schedulePeriodicUpdate(it)
                 MinimalWidgetProvider().schedulePeriodicUpdate(it)
+                UpcomingDaysWidgetProvider().schedulePeriodicUpdate(it)
+                // WeekViewWidgetProvider().schedulePeriodicUpdate(it) // 已禁用
                 WidgetMidnightReceiver.scheduleMidnightUpdate(it)
             }
         }
     }
 }
+
+/**
+ * 近日课程小组件周期性更新接收器
+ */
+class UpcomingDaysPeriodicReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        context?.let {
+            UpcomingDaysWidgetProvider().onUpdate(
+                it,
+                AppWidgetManager.getInstance(it),
+                AppWidgetManager.getInstance(it).getAppWidgetIds(ComponentName(it, UpcomingDaysWidgetProvider::class.java))
+            )
+            ScheduleWidgetUpdateService.scheduleNextUpdate(it)
+        }
+    }
+}
+
+/**
+ * 一周课程小组件周期性更新接收器（已禁用）
+ */
+/*
+class WeekViewPeriodicReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        context?.let {
+            WeekViewWidgetProvider().onUpdate(
+                it,
+                AppWidgetManager.getInstance(it),
+                AppWidgetManager.getInstance(it).getAppWidgetIds(ComponentName(it, WeekViewWidgetProvider::class.java))
+            )
+            ScheduleWidgetUpdateService.scheduleNextUpdate(it)
+        }
+    }
+}
+*/
 
 /**
  * 课程结束时更新小组件
