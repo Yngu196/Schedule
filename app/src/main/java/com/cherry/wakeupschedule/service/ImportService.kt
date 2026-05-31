@@ -409,38 +409,44 @@ class ImportService(private val context: Context) {
 
     // 合并相同课程
     private fun mergeCourses(courses: List<Course>): List<Course> {
-        // 只按核心信息分组：课程名+星期+开始节次+结束节次，不包含老师和教室
-        val groups = courses.groupBy { "${it.name}-${it.dayOfWeek}-${it.startTime}-${it.endTime}" }
+        // 按完整的课程信息分组：课程名+老师+教室+星期+开始节次+结束节次
+        // 这样确保不同老师或不同课程的相同时间段不会被错误合并
+        val groups = courses.groupBy { "${it.name}-${it.teacher}-${it.classroom}-${it.dayOfWeek}-${it.startTime}-${it.endTime}" }
         return groups.map { (_, group) ->
-            val startWeek = group.minOf { it.startWeek }
-            val endWeek = group.maxOf { it.endWeek }
-            val weekNumbers = group.flatMap { it.startWeek..it.endWeek }.toSet()
-            val weekType = when {
-                weekNumbers.all { w -> w % 2 == 1 } -> 1
-                weekNumbers.all { w -> w % 2 == 0 } -> 2
-                else -> 0
+            val sortedGroup = group.sortedBy { it.startWeek }
+            val result = mutableListOf<Course>()
+            
+            // 尝试合并连续或重叠的周范围
+            if (sortedGroup.isNotEmpty()) {
+                var current = sortedGroup[0]
+                for (i in 1 until sortedGroup.size) {
+                    val next = sortedGroup[i]
+                    // 如果周范围连续或重叠，则合并
+                    if (next.startWeek <= current.endWeek + 1) {
+                        // 合并：取最小的开始周和最大的结束周
+                        val newStartWeek = minOf(current.startWeek, next.startWeek)
+                        val newEndWeek = maxOf(current.endWeek, next.endWeek)
+                        current = current.copy(startWeek = newStartWeek, endWeek = newEndWeek)
+                    } else {
+                        // 不连续，保存当前的，开始新的
+                        result.add(current)
+                        current = next
+                    }
+                }
+                result.add(current)
             }
             
-            // 合并老师和教室：如果有多个不同的老师/教室，用分号拼接；否则用单一的
-            val teachers = group.map { it.teacher }.filter { it.isNotBlank() }.distinct()
-            val classrooms = group.map { it.classroom }.filter { it.isNotBlank() }.distinct()
-            
-            val first = group[0]
-            Course(
-                name = first.name,
-                teacher = if (teachers.size == 1) teachers[0] else teachers.joinToString("; "),
-                classroom = if (classrooms.size == 1) classrooms[0] else classrooms.joinToString("; "),
-                dayOfWeek = first.dayOfWeek,
-                startTime = first.startTime,
-                endTime = first.endTime,
-                startWeek = startWeek,
-                endWeek = endWeek,
-                weekType = weekType,
-                alarmEnabled = first.alarmEnabled,
-                alarmMinutesBefore = first.alarmMinutesBefore,
-                color = first.color
-            )
-        }
+            // 对于合并后的课程，重新计算 weekType
+            result.map { course ->
+                val weekNumbers = (course.startWeek..course.endWeek).toSet()
+                val weekType = when {
+                    weekNumbers.all { w -> w % 2 == 1 } -> 1
+                    weekNumbers.all { w -> w % 2 == 0 } -> 2
+                    else -> 0
+                }
+                course.copy(weekType = weekType)
+            }
+        }.flatten()
     }
 
     private fun getFileName(uri: Uri): String? {
