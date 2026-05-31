@@ -292,6 +292,19 @@ class ImportService(private val context: Context) {
                 Regex("""第(\d+)周""").find(weekCellValue)?.let { weekNumbers.add(it.groupValues[1].toInt()) }
             }
             if (weekNumbers.isEmpty()) return courses
+            
+            // 使用data class作为key，避免字符串split的问题
+            data class CourseKey(
+                val name: String,
+                val teacher: String,
+                val classroom: String,
+                val dayOfWeek: Int,
+                val startTime: Int,
+                val endTime: Int
+            )
+            
+            val courseMap = mutableMapOf<CourseKey, MutableList<Int>>()
+            
             for (slotIndex in 0 until 7) {
                 val courseRow = sheet.getRow(startRow + 4 + slotIndex) ?: continue
                 if (!getCellValue(courseRow.getCell(0)).contains("大节")) continue
@@ -302,8 +315,41 @@ class ImportService(private val context: Context) {
                         val col = startCol + dayOff
                         val cellValue = getCellValue(courseRow.getCell(col))
                         if (cellValue.isBlank()) continue
-                        parseCourseCell(cellValue, dayOff + 1, slotIndex * 2 + 1, weekNum)?.let { courses.add(it) }
+                        parseCourseCell(cellValue, dayOff + 1, slotIndex * 2 + 1, weekNum)?.let { course ->
+                            val courseKey = CourseKey(
+                                course.name,
+                                course.teacher,
+                                course.classroom,
+                                course.dayOfWeek,
+                                course.startTime,
+                                course.endTime
+                            )
+                            if (!courseMap.containsKey(courseKey)) {
+                                courseMap[courseKey] = mutableListOf()
+                            }
+                            courseMap[courseKey]?.add(weekNum)
+                        }
                     }
+                }
+            }
+            
+            // 根据收集到的周次创建课程
+            for ((courseKey, weekNums) in courseMap) {
+                if (weekNums.isNotEmpty()) {
+                    val sortedWeeks = weekNums.sorted()
+                    val startWeek = sortedWeeks.first()
+                    val endWeek = sortedWeeks.last()
+                    
+                    courses.add(Course(
+                        name = courseKey.name,
+                        teacher = courseKey.teacher,
+                        classroom = courseKey.classroom,
+                        dayOfWeek = courseKey.dayOfWeek,
+                        startTime = courseKey.startTime,
+                        endTime = courseKey.endTime,
+                        startWeek = startWeek,
+                        endWeek = endWeek
+                    ))
                 }
             }
         } catch (e: Exception) {

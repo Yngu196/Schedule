@@ -1373,7 +1373,8 @@ class MainActivity : AppCompatActivity() {
                 course.startTime <= maxNodes
             }
 
-            // 按位置分组课程，检测冲突
+            // 改进的冲突检测：按位置分组，并且只对在当前显示周(displayWeek)有重叠的课程才标记为冲突
+            // 同时对于非本周课程，即使在同一位置，也不应该标记为冲突（除非它们在同一周范围）
             val courseGroups = mutableMapOf<Pair<Int, Int>, MutableList<Pair<Course, Int>>>()
 
             validCourses.forEachIndexed { index, course ->
@@ -1390,12 +1391,18 @@ class MainActivity : AppCompatActivity() {
             validCourses.forEachIndexed { index, course ->
                 val color = if (course.color != 0) course.color else getCourseColors()[index % getCourseColors().size]
                 val key = Pair(course.dayOfWeek - 1, course.startTime - 1)
-                val conflictCourses = courseGroups[key] ?: listOf()
-                val hasConflict = conflictCourses.size > 1
+                val allCoursesAtPosition = courseGroups[key] ?: listOf()
+                
+                // 改进的冲突检测：只有在当前显示周都有课的课程才算冲突
+                val conflictingCoursesAtDisplayWeek = allCoursesAtPosition.filter { (c, _) ->
+                    isCourseActiveInWeek(c, displayWeek)
+                }
+                val hasConflict = conflictingCoursesAtDisplayWeek.size > 1
+                
                 val alpha = getCourseAlpha(course)
                 val isHighlight = course == highlightCourse
 
-                addCourseCard(course, color, hasConflict, alpha, conflictCourses, isHighlight)
+                addCourseCard(course, color, hasConflict, alpha, allCoursesAtPosition, isHighlight)
             }
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Error displaying courses", e)
