@@ -144,18 +144,10 @@ class NotificationHelper(private val context: Context) {
     /**
      * 显示通知
      */
-    fun showNotification(notificationId: Int, notification: android.app.Notification, courseName: String = "") {
-        DebugLogger.logInfo("showNotification called with id: $notificationId")
+    fun showNotification(notificationId: Int, notification: android.app.Notification, @Suppress("UNUSED_PARAMETER") courseName: String = "") {
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
             == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            DebugLogger.logInfo("Notification permission granted, showing notification")
             NotificationManagerCompat.from(context).notify(notificationId, notification)
-            if (courseName.isNotEmpty()) {
-                DebugLogger.logNotificationShow(courseName)
-            }
-            DebugLogger.logInfo("Notification shown successfully")
-        } else {
-            DebugLogger.logWarn("Notification permission NOT granted")
         }
     }
 

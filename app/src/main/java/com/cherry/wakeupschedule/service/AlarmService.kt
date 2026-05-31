@@ -213,13 +213,11 @@ class AlarmService(private val context: Context) {
         fun scheduleDailyAlarmRefreshes(context: Context) {
             val settingsManager = SettingsManager(context)
             if (!settingsManager.isAlarmEnabled()) {
-                DebugLogger.logInfo("每日刷新闹钟：课前提醒已关闭，跳过")
                 return
             }
             DAILY_REFRESH_HOURS.forEachIndexed { index, hour ->
                 scheduleDailyAlarmRefreshAtHour(context, hour, DAILY_REFRESH_BASE_REQUEST_CODE + index)
             }
-            DebugLogger.logInfo("多时段每日刷新已设置：${DAILY_REFRESH_HOURS.joinToString(",")}点")
         }
 
         /**
@@ -278,7 +276,6 @@ class AlarmService(private val context: Context) {
                 )
                 alarmManager.cancel(pendingIntent)
             }
-            DebugLogger.logInfo("所有每日刷新闹钟已取消")
         }
     }
 
@@ -549,19 +546,16 @@ class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let { DebugLogger.init(it) }
-        DebugLogger.logInfo("AlarmReceiver onReceive called")
         intent?.let {
             val courseName = it.getStringExtra("course_name") ?: ""
             val teacher = it.getStringExtra("course_teacher") ?: ""
             val location = it.getStringExtra("course_location") ?: ""
-            DebugLogger.logAlarmReceive(courseName)
 
             if (context != null && courseName.isNotEmpty()) {
                 // 防重复通知：5秒内同一课程不重复弹通知
                 val now = System.currentTimeMillis()
                 lastNotificationTime[courseName]?.let { last ->
                     if (now - last < DEBOUNCE_MS) {
-                        DebugLogger.logWarn("跳过重复通知: $courseName (距上次 ${now - last}ms)")
                         return
                     }
                 }
@@ -639,7 +633,6 @@ class BootCompletedReceiver : BroadcastReceiver() {
 class DailyAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         DebugLogger.init(context)
-        DebugLogger.logInfo("DailyAlarmReceiver 触发：开始每日闹钟刷新")
         if (intent?.action != AlarmService.DAILY_REFRESH_ACTION) return
 
         val refreshHour = intent.getIntExtra("refresh_hour", 4)
@@ -651,14 +644,10 @@ class DailyAlarmReceiver : BroadcastReceiver() {
                 if (settingsManager.isAlarmEnabled()) {
                     val alarmService = AlarmService(context)
                     alarmService.registerAllCourseNotifications()
-                    DebugLogger.logInfo("每日闹钟刷新完成 (${refreshHour}:00)")
-                } else {
-                    DebugLogger.logInfo("每日闹钟刷新：课前提醒已关闭，跳过")
                 }
                 // 重新调度同一时段的下一次刷新
                 AlarmService.scheduleDailyAlarmRefreshAtHour(context, refreshHour, refreshRequestCode)
             } catch (e: Exception) {
-                DebugLogger.logError("每日闹钟刷新失败", e)
                 Log.e("DailyAlarmReceiver", "Failed to refresh daily alarms", e)
             }
         }
