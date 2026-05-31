@@ -240,50 +240,59 @@ class UpdateService(private val context: Context) {
 
     // 简单的 Markdown 到 HTML 转换
     private fun markdownToHtml(markdown: String): String {
+        if (markdown.isBlank()) {
+            return """
+                <!DOCTYPE html>
+                <html>
+                <body>
+                    <p>暂无更新说明</p>
+                </body>
+                </html>
+            """.trimIndent()
+        }
+        
         var html = markdown
             // 处理标题
-            .replace(Regex("(?m)^### (.+)"), "<h3>$1</h3>")
-            .replace(Regex("(?m)^## (.+)"), "<h2>$1</h2>")
-            .replace(Regex("(?m)^# (.+)"), "<h1>$1</h1>")
+            .replace(Regex("^### (.+)", RegexOption.MULTILINE), "<h3>$1</h3>")
+            .replace(Regex("^## (.+)", RegexOption.MULTILINE), "<h2>$1</h2>")
+            .replace(Regex("^# (.+)", RegexOption.MULTILINE), "<h1>$1</h1>")
             // 处理加粗和斜体
             .replace(Regex("\\*\\*(.+?)\\*\\*"), "<strong>$1</strong>")
             .replace(Regex("\\*(.+?)\\*"), "<em>$1</em>")
             // 处理代码
             .replace(Regex("`(.+?)`"), "<code>$1</code>")
-            // 处理列表（不依赖行开头，更兼容）
-            .replace(Regex("(?m)^- (.+)"), "<li>$1</li>")
-            .replace(Regex("(?m)^\\* (.+)"), "<li>$1</li>")
+            // 处理列表
+            .replace(Regex("^- (.+)", RegexOption.MULTILINE), "<li>$1</li>")
+            .replace(Regex("^\\* (.+)", RegexOption.MULTILINE), "<li>$1</li>")
             // 处理换行
             .replace(Regex("\\n\\n"), "</p><p>")
-            .replace(Regex("\\n"), "<br>")
+            .replace("\n", "<br>")
 
-        // 包裹 HTML 结构，确保内容可滚动
+        // 包裹 HTML 结构
         html = """
             <!DOCTYPE html>
             <html>
             <head>
                 <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
                     body { 
-                        font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
-                        font-size: 14px; 
+                        font-family: sans-serif; 
+                        font-size: 30px; 
                         line-height: 1.6; 
                         padding: 8px; 
                         margin: 0; 
                         color: #333;
-                        word-wrap: break-word;
                     }
-                    h1 { font-size: 18px; margin-top: 8px; margin-bottom: 8px; }
-                    h2 { font-size: 16px; margin-top: 8px; margin-bottom: 8px; }
-                    h3 { font-size: 15px; margin-top: 8px; margin-bottom: 8px; }
+                    h1 { font-size: 36px; margin: 10px 0; }
+                    h2 { font-size: 33px; margin: 10px 0; }
+                    h3 { font-size: 31px; margin: 10px 0; }
                     p { margin: 8px 0; }
-                    li { margin-left: 16px; margin-bottom: 4px; }
+                    li { margin-left: 16px; margin-bottom: 6px; }
                     code { 
-                        background: #f5f5f5; 
+                        background: #f0f0f0; 
                         padding: 2px 6px; 
                         border-radius: 3px; 
-                        font-size: 13px;
+                        font-size: 28px;
                     }
                 </style>
             </head>
@@ -308,9 +317,16 @@ class UpdateService(private val context: Context) {
         webViewNotes.settings.javaScriptEnabled = false
         webViewNotes.isVerticalScrollBarEnabled = true
         webViewNotes.isHorizontalScrollBarEnabled = false
+        webViewNotes.settings.useWideViewPort = true
+        webViewNotes.settings.loadWithOverviewMode = true
+        webViewNotes.setBackgroundColor(0x00000000) // 透明背景
+        webViewNotes.settings.setSupportZoom(true)
+        webViewNotes.settings.builtInZoomControls = true
+        webViewNotes.settings.displayZoomControls = false
+        webViewNotes.settings.textZoom = 150
         
         val htmlContent = markdownToHtml(notes)
-        webViewNotes.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+        webViewNotes.loadDataWithBaseURL(null, htmlContent, "text/html; charset=UTF-8", "UTF-8", null)
         
         val dialog = AlertDialog.Builder(context)
             .setView(dialogView)
