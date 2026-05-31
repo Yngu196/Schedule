@@ -437,7 +437,7 @@ class ImportService(private val context: Context) {
             }
             
             // 对于合并后的课程，重新计算 weekType
-            result.map { course ->
+            val resultWithWeekType = result.map { course ->
                 val weekNumbers = (course.startWeek..course.endWeek).toSet()
                 val weekType = when {
                     weekNumbers.all { w -> w % 2 == 1 } -> 1
@@ -446,6 +446,7 @@ class ImportService(private val context: Context) {
                 }
                 course.copy(weekType = weekType)
             }
+            resultWithWeekType
         }.flatten()
     }
 

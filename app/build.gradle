@@ -21,12 +21,31 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    applicationVariants.all {
-        variant ->
-            variant.outputs.each {
-                output ->
-                    output.outputFileName = "Schedule-app-${variant.buildType.name}-${defaultConfig.versionName}.apk"
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            universalApk true
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.each { output ->
+            def versionCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86_64': 3, 'universal': 0]
+            def abi = output.getFilter(com.android.build.OutputFile.ABI)
+            def baseVersionCode = android.defaultConfig.versionCode
+            
+            if (abi == null) {
+                // Universal APK
+                output.versionCodeOverride = baseVersionCode * 10 + 0
+                output.outputFileName = "Schedule-app-${variant.buildType.name}-${defaultConfig.versionName}-universal.apk"
+            } else {
+                // Specific ABI APK
+                output.versionCodeOverride = baseVersionCode * 10 + versionCodes.get(abi)
+                output.outputFileName = "Schedule-app-${variant.buildType.name}-${defaultConfig.versionName}-${abi}.apk"
             }
+        }
     }
 
     signingConfigs {
