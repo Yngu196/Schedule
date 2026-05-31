@@ -8,17 +8,17 @@ plugins {
 
 
 android {
-    namespace 'com.cherry.wakeupschedule'
-    compileSdk 35
+    namespace = 'com.cherry.wakeupschedule'
+    compileSdk = 35
 
     defaultConfig {
-        applicationId "com.cherry.wakeupschedule"
-        minSdk 26
-        targetSdk 35
-        versionCode 1501
-        versionName "1.7.1"
+        applicationId = "com.cherry.wakeupschedule"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 1501
+        versionName = "1.7.1"
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     applicationVariants.all {
@@ -31,35 +31,35 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("../wakeup-schedule-key.jks")
-            storePassword System.getenv("RELEASE_STORE_PASSWORD") ?: ""
-            keyAlias "wakeup_schedule"
-            keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: ""
+            storeFile = file("../wakeup-schedule-key.jks")
+            storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: ""
+            keyAlias = "wakeup_schedule"
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: ""
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled = false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig = signingConfigs.release
         }
     }
     
     packagingOptions {
-        exclude 'META-INF/INDEX.LIST'
-        exclude 'META-INF/DEPENDENCIES'
-        exclude 'META-INF/groovy-release-info.properties'
-        exclude 'META-INF/groovy/**'
-        exclude 'META-INF/groovy-dateutil/**'
-        exclude 'META-INF/LICENSE.md'
-        exclude 'META-INF/NOTICE.md'
-        pickFirst 'META-INF/groovy-release-info.properties'
+        exclude('META-INF/INDEX.LIST')
+        exclude('META-INF/DEPENDENCIES')
+        exclude('META-INF/groovy-release-info.properties')
+        exclude('META-INF/groovy/**')
+        exclude('META-INF/groovy-dateutil/**')
+        exclude('META-INF/LICENSE.md')
+        exclude('META-INF/NOTICE.md')
+        pickFirst('META-INF/groovy-release-info.properties')
     }
     
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     
     kotlinOptions {
@@ -68,8 +68,8 @@ android {
     }
     
     buildFeatures {
-        viewBinding true
-        buildConfig true
+        viewBinding = true
+        buildConfig = true
     }
     
     lint {

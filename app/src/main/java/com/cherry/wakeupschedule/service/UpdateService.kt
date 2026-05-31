@@ -29,7 +29,6 @@ class UpdateService(private val context: Context) {
     companion object {
         private const val TAG = "UpdateService"
         private const val GITHUB_API_URL = "https://api.github.com/repos/Yngu196/Schedule/releases"
-        private const val GITHUB_PROXY_URL = "https://ghproxy.com/"
         private const val LANZOU_URL = "https://wwbph.lanzn.com/b019vqfy9c"
     }
 
@@ -242,30 +241,55 @@ class UpdateService(private val context: Context) {
     // 简单的 Markdown 到 HTML 转换
     private fun markdownToHtml(markdown: String): String {
         var html = markdown
-            .replace(Regex("^### (.+)"), "<h3>$1</h3>")
-            .replace(Regex("^## (.+)"), "<h2>$1</h2>")
-            .replace(Regex("^# (.+)"), "<h1>$1</h1>")
+            // 处理标题
+            .replace(Regex("(?m)^### (.+)"), "<h3>$1</h3>")
+            .replace(Regex("(?m)^## (.+)"), "<h2>$1</h2>")
+            .replace(Regex("(?m)^# (.+)"), "<h1>$1</h1>")
+            // 处理加粗和斜体
             .replace(Regex("\\*\\*(.+?)\\*\\*"), "<strong>$1</strong>")
             .replace(Regex("\\*(.+?)\\*"), "<em>$1</em>")
+            // 处理代码
             .replace(Regex("`(.+?)`"), "<code>$1</code>")
-            .replace(Regex("^- (.+)"), "<li>$1</li>")
-            .replace(Regex("\\n\\n"), "</li><li>")
-            .replace("<li></li>", "")
+            // 处理列表（不依赖行开头，更兼容）
+            .replace(Regex("(?m)^- (.+)"), "<li>$1</li>")
+            .replace(Regex("(?m)^\\* (.+)"), "<li>$1</li>")
+            // 处理换行
+            .replace(Regex("\\n\\n"), "</p><p>")
             .replace(Regex("\\n"), "<br>")
 
+        // 包裹 HTML 结构，确保内容可滚动
         html = """
             <!DOCTYPE html>
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: sans-serif; font-size: 14px; line-height: 1.5; padding: 0; margin: 0; }
-                    h1, h2, h3 { margin-top: 16px; margin-bottom: 8px; }
-                    li { margin-left: 16px; }
-                    code { background: #f0f0f0; padding: 2px 4px; border-radius: 3px; }
+                    body { 
+                        font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+                        font-size: 14px; 
+                        line-height: 1.6; 
+                        padding: 8px; 
+                        margin: 0; 
+                        color: #333;
+                        word-wrap: break-word;
+                    }
+                    h1 { font-size: 18px; margin-top: 8px; margin-bottom: 8px; }
+                    h2 { font-size: 16px; margin-top: 8px; margin-bottom: 8px; }
+                    h3 { font-size: 15px; margin-top: 8px; margin-bottom: 8px; }
+                    p { margin: 8px 0; }
+                    li { margin-left: 16px; margin-bottom: 4px; }
+                    code { 
+                        background: #f5f5f5; 
+                        padding: 2px 6px; 
+                        border-radius: 3px; 
+                        font-size: 13px;
+                    }
                 </style>
             </head>
-            <body>$html</body>
+            <body>
+                <p>$html</p>
+            </body>
             </html>
         """.trimIndent()
         return html
@@ -280,6 +304,11 @@ class UpdateService(private val context: Context) {
         
         tvVersionInfo.text = "发现新版本: $version\n当前版本: $currentVersion"
         
+        // 配置 WebView 确保内容能正常显示
+        webViewNotes.settings.javaScriptEnabled = false
+        webViewNotes.isVerticalScrollBarEnabled = true
+        webViewNotes.isHorizontalScrollBarEnabled = false
+        
         val htmlContent = markdownToHtml(notes)
         webViewNotes.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
         
@@ -287,19 +316,8 @@ class UpdateService(private val context: Context) {
             .setView(dialogView)
             .create()
         
-        val proxyUrl = if (url.startsWith("https://github.com/") || url.startsWith("https://objects.githubusercontent.com/")) {
-            GITHUB_PROXY_URL + url
-        } else {
-            url
-        }
-        
         dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download_original).setOnClickListener {
             openDownloadPage(url)
-            dialog.dismiss()
-        }
-        
-        dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download_proxy).setOnClickListener {
-            openDownloadWithSystemBrowser(proxyUrl)
             dialog.dismiss()
         }
 

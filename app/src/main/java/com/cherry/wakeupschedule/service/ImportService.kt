@@ -409,21 +409,27 @@ class ImportService(private val context: Context) {
 
     // 合并相同课程
     private fun mergeCourses(courses: List<Course>): List<Course> {
-        val groups = courses.groupBy { "${it.name}-${it.teacher}-${it.classroom}-${it.dayOfWeek}-${it.startTime}-${it.endTime}" }
+        // 只按核心信息分组：课程名+星期+开始节次+结束节次，不包含老师和教室
+        val groups = courses.groupBy { "${it.name}-${it.dayOfWeek}-${it.startTime}-${it.endTime}" }
         return groups.map { (_, group) ->
             val startWeek = group.minOf { it.startWeek }
             val endWeek = group.maxOf { it.endWeek }
-            val weekNumbers = group.map { it.startWeek }.toSet()
+            val weekNumbers = group.flatMap { it.startWeek..it.endWeek }.toSet()
             val weekType = when {
                 weekNumbers.all { w -> w % 2 == 1 } -> 1
                 weekNumbers.all { w -> w % 2 == 0 } -> 2
                 else -> 0
             }
+            
+            // 合并老师和教室：如果有多个不同的老师/教室，用分号拼接；否则用单一的
+            val teachers = group.map { it.teacher }.filter { it.isNotBlank() }.distinct()
+            val classrooms = group.map { it.classroom }.filter { it.isNotBlank() }.distinct()
+            
             val first = group[0]
             Course(
                 name = first.name,
-                teacher = first.teacher,
-                classroom = first.classroom,
+                teacher = if (teachers.size == 1) teachers[0] else teachers.joinToString("; "),
+                classroom = if (classrooms.size == 1) classrooms[0] else classrooms.joinToString("; "),
                 dayOfWeek = first.dayOfWeek,
                 startTime = first.startTime,
                 endTime = first.endTime,

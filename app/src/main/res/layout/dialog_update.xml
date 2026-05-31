@@ -58,16 +58,6 @@
             android:background="?attr/selectableItemBackground" />
 
         <TextView
-            android:id="@+id/btn_download_proxy"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="GitHub Proxy 加速下载 (国内推荐)"
-            android:textSize="14sp"
-            android:textColor="#4CAF50"
-            android:padding="12dp"
-            android:background="?attr/selectableItemBackground" />
-
-        <TextView
             android:id="@+id/btn_download_lanzou"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
