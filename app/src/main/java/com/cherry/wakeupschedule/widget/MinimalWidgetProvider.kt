@@ -8,6 +8,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.SystemClock
 import android.widget.RemoteViews
 import com.cherry.wakeupschedule.MainActivity
 import com.cherry.wakeupschedule.R
@@ -19,6 +20,8 @@ import java.util.Calendar
 /**
  * 最小化小组件提供者
  * 显示下课倒计时
+ * - API 24+ 使用系统 Chronometer 实现硬件级倒计时，进程被杀也不影响
+ * - API < 24 使用短周期精确闹钟保底刷新
  */
 class MinimalWidgetProvider : AppWidgetProvider() {
 
@@ -26,7 +29,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         const val ACTION_REFRESH = "com.cherry.wakeupschedule.widget.minimal.ACTION_REFRESH"
         private const val WIDGET_MINIMAL_PERIODIC_REQUEST_CODE = 10004
         private const val WIDGET_MINIMAL_COURSE_END_REQUEST_CODE = 10006
+        private const val WIDGET_MINIMAL_TICK_REQUEST_CODE = 10007
         private const val MINIMAL_PERIODIC_UPDATE_INTERVAL = 15 * 60 * 1000L
+        private const val MINIMAL_TICK_INTERVAL = 30 * 1000L
 
         /**
          * 触发小组件更新
@@ -64,6 +69,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         try {
             cancelPeriodicUpdate(context)
             cancelMinimalCourseEndUpdate(context)
+            cancelMinimalTick(context)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -72,8 +78,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         when (intent.action) {
-            ACTION_REFRESH -> updateAllWidgets(context)
-            "com.cherry.wakeupschedule.widget.ACTION_PERIODIC_UPDATE" -> updateAllWidgets(context)
+            ACTION_REFRESH,
+            "com.cherry.wakeupschedule.widget.ACTION_PERIODIC_UPDATE",
+            "com.cherry.wakeupschedule.widget.minimal.ACTION_TICK" -> updateAllWidgets(context)
         }
     }
 
@@ -245,6 +252,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
 
     /**
      * 更新小组件内容
+     * API 24+ 使用系统 Chronometer 实现硬件级倒计时，即使进程被杀也能继续走
      */
     private fun updateWidgetContent(context: Context, views: RemoteViews) {
         try {
@@ -279,25 +287,97 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 currentCourse != null -> {
                     views.setTextViewText(R.id.tv_widget_title, "下课倒计时")
                     views.setTextViewText(R.id.tv_course_name, currentCourse.name)
-                    val endSeconds = getCourseEndMinutes(context, currentCourse) * 60
-                    val remainingSeconds = (endSeconds - currentTimeSeconds).coerceAtLeast(0)
-                    val mins = remainingSeconds / 60
-                    val secs = remainingSeconds % 60
-                    views.setTextViewText(R.id.tv_countdown, "${mins}分${secs}秒")
                     views.setTextViewText(R.id.tv_course_time, "后下课")
+
+                    val endSeconds = getCourseEndMinutes(context, currentCourse) * 60
+                    val remainingMillis = ((endSeconds - currentTimeSeconds).coerceAtLeast(1)) * 1000L
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        views.setViewVisibility(R.id.tv_countdown, android.view.View.GONE)
+                        views.setViewVisibility(R.id.chronometer_countdown, android.view.View.VISIBLE)
+                        views.setChronometerCountDown(R.id.chronometer_countdown, true)
+                        views.setChronometer(
+                            R.id.chronometer_countdown,
+                            SystemClock.elapsedRealtime() + remainingMillis,
+                            "%s",
+                            true
+                        )
+                        cancelMinimalTick(context)
+                    } else {
+                        views.setViewVisibility(R.id.chronometer_countdown, android.view.View.GONE)
+                        views.setViewVisibility(R.id.tv_countdown, android.view.View.VISIBLE)
+                        val mins = remainingMillis / 60000
+                        val secs = (remainingMillis % 60000) / 1000
+                        views.setTextViewText(R.id.tv_countdown, "%02d:%02d".format(mins, secs))
+                        scheduleMinimalTick(context)
+                    }
                 }
                 else -> {
                     views.setTextViewText(R.id.tv_widget_title, "下课倒计时")
                     views.setTextViewText(R.id.tv_course_name, "当前没课")
-                    views.setTextViewText(R.id.tv_countdown, "--")
                     views.setTextViewText(R.id.tv_course_time, "")
+                    views.setViewVisibility(R.id.chronometer_countdown, android.view.View.GONE)
+                    views.setViewVisibility(R.id.tv_countdown, android.view.View.VISIBLE)
+                    views.setTextViewText(R.id.tv_countdown, "--")
+                    cancelMinimalTick(context)
                 }
             }
         } catch (e: Exception) {
             views.setTextViewText(R.id.tv_widget_title, "下课倒计时")
             views.setTextViewText(R.id.tv_course_name, "加载失败")
-            views.setTextViewText(R.id.tv_countdown, "--")
             views.setTextViewText(R.id.tv_course_time, "")
+            views.setViewVisibility(R.id.chronometer_countdown, android.view.View.GONE)
+            views.setViewVisibility(R.id.tv_countdown, android.view.View.VISIBLE)
+            views.setTextViewText(R.id.tv_countdown, "--")
+        }
+    }
+
+    /**
+     * 为低版本 Android 安排短周期刷新（每30秒），弥补无 Chronometer countdown 的缺陷
+     */
+    private fun scheduleMinimalTick(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) return
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_MINIMAL_TICK_REQUEST_CODE,
+                Intent(context, MinimalWidgetTickReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis() + MINIMAL_TICK_INTERVAL,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.set(
+                    AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis() + MINIMAL_TICK_INTERVAL,
+                    pendingIntent
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * 取消短周期刷新
+     */
+    private fun cancelMinimalTick(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_MINIMAL_TICK_REQUEST_CODE,
+                Intent(context, MinimalWidgetTickReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

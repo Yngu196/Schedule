@@ -124,6 +124,7 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         setupObservers()
         setupSwipeGesture()
+        updateWeekDisplay()
         updateDateDisplay()
         // generateTimeAxis必须在applyBackgroundSettings之前执行，以便timeAxisViews被正确填充
         generateTimeAxis()
@@ -226,6 +227,7 @@ class MainActivity : AppCompatActivity() {
             animateWeekSwitch(isNext = false) {
                 displayWeek--
                 updateWeekDisplay()
+                updateDateDisplay()
                 viewModel.loadCoursesForWeek(displayWeek)
             }
         }
@@ -236,6 +238,7 @@ class MainActivity : AppCompatActivity() {
             animateWeekSwitch(isNext = true) {
                 displayWeek++
                 updateWeekDisplay()
+                updateDateDisplay()
                 viewModel.loadCoursesForWeek(displayWeek)
             }
         }
@@ -765,6 +768,7 @@ class MainActivity : AppCompatActivity() {
             if (displayWeek != currentWeek) {
                 displayWeek = currentWeek
                 updateWeekDisplay()
+                updateDateDisplay()
                 viewModel.loadCoursesForWeek(displayWeek)
                 Toast.makeText(this, "已切换到本周 (第${currentWeek}周)", Toast.LENGTH_SHORT).show()
             }
@@ -1209,14 +1213,19 @@ class MainActivity : AppCompatActivity() {
     private fun updateDateDisplay() {
         val calendar = Calendar.getInstance()
         binding.tvDate.text = dateFormat.format(calendar.time)
-        updateWeekDisplay()
 
         val dateViews = listOf(
             binding.tvDate1, binding.tvDate2, binding.tvDate3,
             binding.tvDate4, binding.tvDate5, binding.tvDate6, binding.tvDate7
         )
 
+        val semesterStartDate = settingsManager.getSemesterStartDate()
         val weekCalendar = Calendar.getInstance()
+
+        if (semesterStartDate > 0L) {
+            weekCalendar.timeInMillis = semesterStartDate
+            weekCalendar.add(Calendar.WEEK_OF_YEAR, displayWeek - 1)
+        }
         weekCalendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
 
         val currentDayOfWeek = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
@@ -1224,7 +1233,7 @@ class MainActivity : AppCompatActivity() {
 
         dateViews.forEachIndexed { index, textView ->
             textView.text = weekCalendar.get(Calendar.DAY_OF_MONTH).toString()
-            if (index + 1 == adjustedDayOfWeek) {
+            if (displayWeek == currentWeek && index + 1 == adjustedDayOfWeek) {
                 textView.setBackgroundResource(R.drawable.bg_date_selected)
             } else {
                 textView.background = null
@@ -1651,6 +1660,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 用户手动打开应用时，取消自动关闭定时器
+        com.cherry.wakeupschedule.service.AutoStartReceiver.cancelShutdown(this)
         // 从课程总览返回时，确保显示正确的视图
         // 如果之前是在day视图，返回后显示"今"，下次点击回到"周"
         // 为了更好的用户体验，我们恢复到之前的状态，悬浮球文字也要对应显示

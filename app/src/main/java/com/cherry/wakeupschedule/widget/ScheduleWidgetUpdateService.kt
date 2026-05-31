@@ -253,3 +253,20 @@ class MinimalWidgetCourseEndReceiver : BroadcastReceiver() {
         }
     }
 }
+
+/**
+ * 最小化小组件短周期刷新接收器（仅用于 API < 24 的低版本设备）
+ */
+class MinimalWidgetTickReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        context?.let {
+            MinimalWidgetProvider().onUpdate(
+                it,
+                AppWidgetManager.getInstance(it),
+                AppWidgetManager.getInstance(it).getAppWidgetIds(
+                    ComponentName(it, MinimalWidgetProvider::class.java)
+                )
+            )
+        }
+    }
+}

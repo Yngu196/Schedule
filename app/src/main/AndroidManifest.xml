@@ -68,6 +68,11 @@
             android:enabled="true"
             android:exported="false" />
 
+        <receiver
+            android:name=".service.AutoStartReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <!-- 桌面小部件 - 今日课程 -->
         <receiver
             android:name=".widget.ScheduleWidgetProvider"
@@ -170,6 +175,11 @@
         <!-- Minimal小组件课程结束更新接收器 -->
         <receiver
             android:name=".widget.MinimalWidgetCourseEndReceiver"
+            android:exported="false" />
+
+        <!-- Minimal小组件短周期刷新接收器（API < 24 低版本保底） -->
+        <receiver
+            android:name=".widget.MinimalWidgetTickReceiver"
             android:exported="false" />
 
         <!-- 近日课程小组件周期性更新接收器 -->

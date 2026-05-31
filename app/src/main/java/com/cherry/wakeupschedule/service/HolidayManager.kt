@@ -40,8 +40,7 @@ class HolidayManager private constructor(private val context: Context) {
         private val FIXED_HOLIDAYS = mapOf(
             "01-01" to "元旦",
             "05-01" to "劳动节",
-            "10-01" to "国庆节",
-            "12-25" to "圣诞节" // 可选
+            "10-01" to "国庆节"
         )
     }
 
