@@ -42,7 +42,7 @@ class NotificationHelper(private val context: Context) {
             val reminderChannel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_MAX
             ).apply {
                 description = "课程开始前的提醒通知"
                 enableVibration(true)
@@ -51,6 +51,12 @@ class NotificationHelper(private val context: Context) {
                 setBypassDnd(true)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    setAllowBubbles(true)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    setImportance(NotificationManager.IMPORTANCE_MAX)
                 }
             }
 
@@ -104,13 +110,16 @@ class NotificationHelper(private val context: Context) {
             .setContentTitle("课前提醒")
             .setContentText(contentText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_EVENT)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setVibrate(longArrayOf(0, 1000, 500, 1000))
             .setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI)
             .setLights(0xFF6200EE.toInt(), 1000, 1000)
             .setContentIntent(pendingIntent)
+            .setFullScreenIntent(pendingIntent, true)
             .setWhen(System.currentTimeMillis())
             .build()
     }

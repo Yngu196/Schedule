@@ -115,6 +115,23 @@ class App : Application() {
     fun registerAllCourseNotifications() {
         if (SettingsManager(this).isAlarmEnabled()) {
             alarmService?.registerAllCourseNotifications()
+            // 启动前台服务，确保闹钟在国产 ROM 上不被杀
+            try {
+                com.cherry.wakeupschedule.service.CourseReminderForegroundService.start(this)
+            } catch (e: Exception) {
+                Log.e("App", "Failed to start foreground service", e)
+            }
+            // 检查精确闹钟权限
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                try {
+                    val am = getSystemService(android.content.Context.ALARM_SERVICE) as android.app.AlarmManager
+                    if (!am.canScheduleExactAlarms()) {
+                        Log.w("App", "未授权精确闹钟权限，课前通知可能无法准时触发")
+                    }
+                } catch (e: Exception) {
+                    Log.e("App", "检查精确闹钟权限失败", e)
+                }
+            }
             Log.d("App", "All course notifications have been re-registered")
         }
     }

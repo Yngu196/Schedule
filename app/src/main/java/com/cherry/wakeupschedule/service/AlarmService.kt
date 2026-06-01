@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -39,6 +40,31 @@ class AlarmService(private val context: Context) {
     private val holidayManager by lazy { HolidayManager.getInstance(context) }
     // 设置管理器
     private val settingsManager by lazy { SettingsManager(context) }
+
+    /**
+     * 检查设备是否支持精确闹钟（SCHEDULE_EXACT_ALARM 权限）
+     * Android 12+ 用户可随时撤回该权限，必须每次都检查
+     */
+    private fun canScheduleExactAlarms(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            alarmManager.canScheduleExactAlarms()
+        } else {
+            true
+        }
+    }
+
+    /**
+     * 设置闹钟的兜底实现：根据权限选择最可靠的 API
+     * 优先级：setAlarmClock > setExactAndAllowWhileIdle > setExact > setAndAllowWhileIdle > set
+     * setAlarmClock 在 Doze 模式下也能保证触发，是通知类场景的最佳选择
+     */
+    private fun scheduleAlarmWithFallback(
+        triggerAtMillis: Long,
+        pendingIntent: PendingIntent,
+        tag: String
+    ): Boolean {
+        return scheduleAlarmWithFallback(context, alarmManager, triggerAtMillis, pendingIntent, tag)
+    }
 
     /**
      * 设置课程闹钟
@@ -96,12 +122,19 @@ class AlarmService(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 使用 setAlarmClock 确保系统将其视为高优先级闹钟，在 Doze 模式下也能触发
-        alarmManager.setAlarmClock(
-            AlarmManager.AlarmClockInfo(alarmTime, null),
-            pendingIntent
-        )
+        // 使用多重兜底设置闹钟，国产 ROM 也能尽量保证触发
+        scheduleAlarmWithFallback(alarmTime, pendingIntent, "course#${course.id}")
         DebugLogger.logAlarmSet(course.name, java.util.Date(alarmTime), course.id.toInt())
+
+        // 兜底：使用 WorkManager 安排一个延迟检查
+        // 应对国产 ROM 杀进程 / 用户撤回精确闹钟权限导致主闹钟失效的场景
+        try {
+            val delayMillis = alarmTime - System.currentTimeMillis()
+            val delayMinutes = (delayMillis / (1000 * 60)).coerceAtLeast(1)
+            ExactAlarmWorker.scheduleReminder(context, course, delayMinutes)
+        } catch (e: Exception) {
+            Log.w("AlarmService", "WorkManager 兜底调度失败", e)
+        }
     }
 
     /**
@@ -207,6 +240,75 @@ class AlarmService(private val context: Context) {
         const val DAILY_REFRESH_ACTION = "com.cherry.wakeupschedule.DAILY_ALARM_REFRESH"
 
         /**
+         * 静态兜底实现：使用最可靠的 API 设置闹钟
+         * 优先级：setAlarmClock > setExactAndAllowWhileIdle > setExact > setAndAllowWhileIdle > set
+         */
+        fun scheduleAlarmWithFallback(
+            context: Context,
+            alarmManager: AlarmManager,
+            triggerAtMillis: Long,
+            pendingIntent: PendingIntent,
+            tag: String
+        ): Boolean {
+            return try {
+                // 1) 优先使用 setAlarmClock：系统在状态栏显示下一个闹钟并以最高优先级触发
+                alarmManager.setAlarmClock(
+                    AlarmManager.AlarmClockInfo(triggerAtMillis, null),
+                    pendingIntent
+                )
+                Log.d("AlarmService", "闹钟($tag)使用 setAlarmClock 设置，时间=${java.util.Date(triggerAtMillis)}")
+                true
+            } catch (e: SecurityException) {
+                Log.w("AlarmService", "setAlarmClock 权限被拒绝($tag)，降级到 setExactAndAllowWhileIdle", e)
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerAtMillis,
+                            pendingIntent
+                        )
+                    } else {
+                        alarmManager.setExact(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerAtMillis,
+                            pendingIntent
+                        )
+                    }
+                    Log.d("AlarmService", "闹钟($tag)使用 setExactAndAllowWhileIdle 降级设置")
+                    true
+                } catch (e2: SecurityException) {
+                    Log.w("AlarmService", "setExact 权限被拒绝($tag)，降级到 setAndAllowWhileIdle", e2)
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setAndAllowWhileIdle(
+                                AlarmManager.RTC_WAKEUP,
+                                triggerAtMillis,
+                                pendingIntent
+                            )
+                        } else {
+                            alarmManager.set(
+                                AlarmManager.RTC_WAKEUP,
+                                triggerAtMillis,
+                                pendingIntent
+                            )
+                        }
+                        Log.d("AlarmService", "闹钟($tag)使用 setAndAllowWhileIdle 兜底设置")
+                        true
+                    } catch (e3: Exception) {
+                        Log.e("AlarmService", "闹钟($tag)所有 set 方法都失败", e3)
+                        false
+                    }
+                } catch (e2: Exception) {
+                    Log.e("AlarmService", "闹钟($tag)setExact 失败", e2)
+                    false
+                }
+            } catch (e: Exception) {
+                Log.e("AlarmService", "闹钟($tag)setAlarmClock 失败", e)
+                false
+            }
+        }
+
+        /**
          * 调度每日多时段闹钟刷新（每4小时一次）
          * 解决国产手机（vivo/OPPO/小米）杀进程后 AlarmManager 闹钟被清除的问题
          */
@@ -249,10 +351,10 @@ class AlarmService(private val context: Context) {
             )
 
             try {
-                alarmManager.setAlarmClock(
-                    AlarmManager.AlarmClockInfo(calendar.timeInMillis, null),
-                    pendingIntent
-                )
+                val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                if (am != null) {
+                    scheduleAlarmWithFallback(context, am, calendar.timeInMillis, pendingIntent, "daily_refresh#${hour}")
+                }
             } catch (e: Exception) {
                 DebugLogger.logError("每日刷新闹钟设置失败(${hour}:00)", e)
             }
@@ -376,11 +478,8 @@ class AlarmService(private val context: Context) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // 使用 setAlarmClock 确保系统将其视为高优先级闹钟
-            alarmManager.setAlarmClock(
-                AlarmManager.AlarmClockInfo(alarmTime, null),
-                pendingIntent
-            )
+            // 使用多重兜底设置闹钟，国产 ROM 也能尽量保证触发
+            scheduleAlarmWithFallback(alarmTime, pendingIntent, "${course.name}#w${week}")
             Log.d("AlarmService", "Registered alarm for ${course.name} week $week at ${java.util.Date(alarmTime)}")
 
             // 设置自动启动闹钟（在课前通知前1分钟自动启动应用）
@@ -397,10 +496,7 @@ class AlarmService(private val context: Context) {
                     autoStartIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                alarmManager.setAlarmClock(
-                    AlarmManager.AlarmClockInfo(autoStartTime, null),
-                    autoStartPendingIntent
-                )
+                scheduleAlarmWithFallback(autoStartTime, autoStartPendingIntent, "autostart#${course.name}#w${week}")
                 Log.d("AlarmService", "Registered auto-start for ${course.name} week $week at ${java.util.Date(autoStartTime)}")
             }
         }
@@ -539,6 +635,7 @@ class AlarmService(private val context: Context) {
 class AlarmReceiver : BroadcastReceiver() {
 
     companion object {
+        private const val TAG = "AlarmReceiver"
         // 防重复通知：记录最近通知时间戳（课程名 -> 最后通知毫秒时间戳）
         private val lastNotificationTime = mutableMapOf<String, Long>()
         private const val DEBOUNCE_MS = 5000L // 5秒内同一课程不再弹通知
@@ -546,55 +643,89 @@ class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let { DebugLogger.init(it) }
-        intent?.let {
-            val courseName = it.getStringExtra("course_name") ?: ""
-            val teacher = it.getStringExtra("course_teacher") ?: ""
-            val location = it.getStringExtra("course_location") ?: ""
+        val ctx = context ?: return
+        val it = intent ?: return
 
-            if (context != null && courseName.isNotEmpty()) {
-                // 防重复通知：5秒内同一课程不重复弹通知
-                val now = System.currentTimeMillis()
-                lastNotificationTime[courseName]?.let { last ->
-                    if (now - last < DEBOUNCE_MS) {
-                        return
+        val courseName = it.getStringExtra("course_name") ?: ""
+        val teacher = it.getStringExtra("course_teacher") ?: ""
+        val location = it.getStringExtra("course_location") ?: ""
+
+        if (courseName.isEmpty()) {
+            Log.w(TAG, "收到空课程名的闹钟广播，跳过")
+            return
+        }
+
+        // 持有 WakeLock 10秒，确保通知展示 / 数据库读取 / 闹钟重注册等操作不被系统休眠打断
+        val powerManager = ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val wakeLock = powerManager?.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "ScheduleApp::AlarmReceiver"
+        )?.apply {
+            setReferenceCounted(false)
+            acquire(10_000L)
+        }
+
+        try {
+            // 防重复通知：5秒内同一课程不重复弹通知
+            val now = System.currentTimeMillis()
+            lastNotificationTime[courseName]?.let { last ->
+                if (now - last < DEBOUNCE_MS) {
+                    Log.d(TAG, "$courseName 防抖，跳过重复通知")
+                    return
+                }
+            }
+            lastNotificationTime[courseName] = now
+            // 清理超过1分钟的旧记录，防止 map 无限增长
+            lastNotificationTime.entries.removeAll { now - it.value > 60000 }
+
+            // 创建通知渠道
+            val notificationHelper = NotificationHelper(ctx)
+            notificationHelper.createNotificationChannels()
+
+            // 获取课程对象
+            val course = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                it.getSerializableExtra("course", Course::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                it.getSerializableExtra("course") as? Course
+            }
+
+            // 使用课程名+周次生成更精确的通知ID，先取消避免堆积
+            val week = it.getIntExtra("notification_week", 0)
+            val uniqueId = if (week > 0) "$courseName#$week".hashCode() else courseName.hashCode()
+            notificationHelper.cancelNotification(uniqueId)
+
+            // 构建并显示通知
+            val notification = notificationHelper.buildCourseReminderNotification(
+                courseName = courseName,
+                teacher = teacher,
+                location = location,
+                minutesBefore = course?.alarmMinutesBefore ?: 15,
+                notificationId = uniqueId
+            )
+
+            notificationHelper.showNotification(uniqueId, notification, courseName)
+            Log.d(TAG, "已弹出课前通知: $courseName week=$week")
+
+            // 为下一周安排闹钟（持续性提醒）+ 同时刷新所有课程闹钟，
+            // 避免周期应用被杀后下节课闹钟被清除
+            if (course != null) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        AlarmService(ctx).setCourseAlarm(course)
+                        AlarmService(ctx).registerAllCourseNotifications()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "重新注册闹钟失败", e)
                     }
                 }
-                lastNotificationTime[courseName] = now
-                // 清理超过1分钟的旧记录，防止 map 无限增长
-                lastNotificationTime.entries.removeAll { now - it.value > 60000 }
-
-                // 创建通知渠道
-                val notificationHelper = NotificationHelper(context)
-                notificationHelper.createNotificationChannels()
-
-                // 获取课程对象
-                val course = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    it.getSerializableExtra("course", Course::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    it.getSerializableExtra("course") as? Course
-                }
-
-                // 使用课程名+周次生成更精确的通知ID，先取消避免堆积
-                val week = it.getIntExtra("notification_week", 0)
-                val uniqueId = if (week > 0) "$courseName#$week".hashCode() else courseName.hashCode()
-                notificationHelper.cancelNotification(uniqueId)
-
-                // 构建并显示通知
-                val notification = notificationHelper.buildCourseReminderNotification(
-                    courseName = courseName,
-                    teacher = teacher,
-                    location = location,
-                    minutesBefore = course?.alarmMinutesBefore ?: 15,
-                    notificationId = uniqueId
-                )
-
-                notificationHelper.showNotification(uniqueId, notification, courseName)
-
-                // 为下一周安排闹钟（持续性提醒）
-                if (course != null) {
-                    AlarmService(context).setCourseAlarm(course)
-                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "处理闹钟广播失败", e)
+        } finally {
+            try {
+                wakeLock?.takeIf { it.isHeld }?.release()
+            } catch (e: Exception) {
+                Log.e(TAG, "释放 WakeLock 失败", e)
             }
         }
     }

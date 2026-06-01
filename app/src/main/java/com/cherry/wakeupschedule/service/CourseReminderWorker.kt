@@ -74,6 +74,13 @@ class CourseReminderWorker(
                 return@withContext Result.success()
             }
 
+            // 兜底：每次执行都刷新一次闹钟（防止主闹钟被清后无人补）
+            try {
+                alarmService.registerAllCourseNotifications()
+            } catch (e: Exception) {
+                Log.w(TAG, "Worker 兜底刷新闹钟失败", e)
+            }
+
             val currentWeek = getCurrentWeek()
             val currentDayOfWeek = getCurrentDayOfWeek()
             val currentTime = getCurrentTimeSlot()
@@ -101,6 +108,12 @@ class CourseReminderWorker(
                         minutesUntilClass in 0..REPEAT_INTERVAL_MINUTES.toInt() -> {
                             Log.d(TAG, "课程 ${course.name} 将在 ${minutesUntilClass} 分钟后开始，调度精确提醒")
                             alarmService.scheduleExactReminder(course)
+                            // 兜底：直接通过 WorkManager 派发通知
+                            ExactAlarmWorker.scheduleReminder(
+                                applicationContext,
+                                course,
+                                minutesUntilClass.coerceAtLeast(1).toLong()
+                            )
                         }
                         minutesUntilClass > REPEAT_INTERVAL_MINUTES -> {
                             Log.d(TAG, "课程 ${course.name} 还有 ${minutesUntilClass} 分钟，暂时不处理")
