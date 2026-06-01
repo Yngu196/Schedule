@@ -6,12 +6,15 @@
     android:paddingVertical="3dp"
     android:minHeight="42dp">
 
-    <View
+    <!-- 颜色指示条：使用 TextView 占位，RemoteViews 不支持裸 View -->
+    <TextView
         android:id="@+id/course_list_indicator"
         android:layout_width="3dp"
         android:layout_height="match_parent"
         android:layout_marginEnd="6dp"
-        android:background="#E57373" />
+        android:background="#E57373"
+        android:text=""
+        android:textSize="0sp" />
 
     <LinearLayout
         android:layout_width="0dp"

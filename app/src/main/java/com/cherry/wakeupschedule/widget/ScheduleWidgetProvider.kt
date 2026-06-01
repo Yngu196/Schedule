@@ -143,8 +143,10 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.tv_widget_week, "第${calculateCurrentWeek(settingsManager)}周")
 
             // 绑定 ListView 到 RemoteViewsService，显示完整今日课程列表（包含已结束）
+            // 使用 data Uri 让系统识别为唯一绑定
             val todayIntent = Intent(context, WidgetCourseListService::class.java).apply {
                 putExtra(WidgetCourseListService.EXTRA_SOURCE, WidgetCourseListService.SOURCE_TODAY)
+                data = android.net.Uri.parse("widget://course-list/today")
             }
             views.setRemoteAdapter(R.id.lv_today_courses, todayIntent)
             views.setEmptyView(R.id.lv_today_courses, android.R.id.empty)

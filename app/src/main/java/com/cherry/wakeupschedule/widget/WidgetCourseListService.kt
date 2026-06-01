@@ -25,7 +25,14 @@ import java.util.Calendar
 class WidgetCourseListService : RemoteViewsService() {
 
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
-        val source = intent.getStringExtra(EXTRA_SOURCE) ?: SOURCE_TODAY
+        // 优先从 Uri 路径解析 source（因为 RemoteViews 缓存时只比 Uri 不比 extras）
+        val uriSource = intent.data?.lastPathSegment
+        val source = when (uriSource) {
+            "today" -> SOURCE_TODAY
+            "upcoming_today" -> SOURCE_UPCOMING_TODAY
+            "tomorrow" -> SOURCE_TOMORROW
+            else -> intent.getStringExtra(EXTRA_SOURCE) ?: SOURCE_TODAY
+        }
         return WidgetCourseListFactory(applicationContext, source)
     }
 

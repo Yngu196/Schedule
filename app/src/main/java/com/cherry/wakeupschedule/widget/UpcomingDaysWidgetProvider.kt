@@ -149,16 +149,19 @@ class UpcomingDaysWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.tv_widget_date, dateFormat.format(calendar.time))
 
             // 绑定 ListView 到 RemoteViewsService
-            // 今日：仅未上课程
+            // 关键：必须用不同的 data Uri 让 RemoteViews 区分两个 Service 绑定
+            // 否则系统会缓存第一个 Intent，导致两个 ListView 共享同一份数据
             val todayIntent = Intent(context, WidgetCourseListService::class.java).apply {
                 putExtra(WidgetCourseListService.EXTRA_SOURCE, WidgetCourseListService.SOURCE_UPCOMING_TODAY)
+                // 不同的 data Uri 让系统识别为不同的 Intent
+                data = android.net.Uri.parse("widget://course-list/upcoming_today")
             }
             views.setRemoteAdapter(R.id.lv_today_courses, todayIntent)
             views.setEmptyView(R.id.lv_today_courses, android.R.id.empty)
 
-            // 明日：全部课程
             val tomorrowIntent = Intent(context, WidgetCourseListService::class.java).apply {
                 putExtra(WidgetCourseListService.EXTRA_SOURCE, WidgetCourseListService.SOURCE_TOMORROW)
+                data = android.net.Uri.parse("widget://course-list/tomorrow")
             }
             views.setRemoteAdapter(R.id.lv_tomorrow_courses, tomorrowIntent)
             views.setEmptyView(R.id.lv_tomorrow_courses, android.R.id.empty)
