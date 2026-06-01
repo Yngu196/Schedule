@@ -57,110 +57,16 @@
                 android:textStyle="bold"
                 android:paddingBottom="4dp" />
 
-            <LinearLayout
-                android:id="@+id/today_course_1"
+            <ListView
+                android:id="@+id/lv_today_courses"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingVertical="2dp">
-
-                <ImageView
-                    android:id="@+id/today_course_1_indicator"
-                    android:layout_width="3dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="6dp"
-                    android:background="#CCCCCC"
-                    android:contentDescription="课程指示器" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tv_today_course_1_name"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="暂无课程"
-                        android:textSize="13sp"
-                        android:textColor="#333333"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-
-                    <TextView
-                        android:id="@+id/tv_today_course_1_location"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="10sp"
-                        android:textColor="#888888"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-
-                    <TextView
-                        android:id="@+id/tv_today_course_1_time"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="9sp"
-                        android:textColor="#AAAAAA" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/today_course_2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingVertical="2dp"
-                android:visibility="gone">
-
-                <ImageView
-                    android:id="@+id/today_course_2_indicator"
-                    android:layout_width="3dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="6dp"
-                    android:background="#FF8A65"
-                    android:contentDescription="课程指示器" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tv_today_course_2_name"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="13sp"
-                        android:textColor="#333333"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-
-                    <TextView
-                        android:id="@+id/tv_today_course_2_location"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="10sp"
-                        android:textColor="#888888"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-
-                    <TextView
-                        android:id="@+id/tv_today_course_2_time"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="9sp"
-                        android:textColor="#AAAAAA" />
-                </LinearLayout>
-            </LinearLayout>
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:divider="@null"
+                android:dividerHeight="0dp"
+                android:scrollbars="vertical"
+                android:fadeScrollbars="false"
+                android:listSelector="@android:color/transparent" />
         </LinearLayout>
 
         <!-- 明天课程（右半） -->
@@ -180,110 +86,16 @@
                 android:textColor="#888888"
                 android:paddingBottom="4dp" />
 
-            <LinearLayout
-                android:id="@+id/tomorrow_course_1"
+            <ListView
+                android:id="@+id/lv_tomorrow_courses"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingVertical="2dp">
-
-                <ImageView
-                    android:id="@+id/tomorrow_course_1_indicator"
-                    android:layout_width="3dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="6dp"
-                    android:background="#CCCCCC"
-                    android:contentDescription="课程指示器" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tv_tomorrow_course_1_name"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="暂无课程"
-                        android:textSize="13sp"
-                        android:textColor="#333333"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-
-                    <TextView
-                        android:id="@+id/tv_tomorrow_course_1_location"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="10sp"
-                        android:textColor="#888888"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-
-                    <TextView
-                        android:id="@+id/tv_tomorrow_course_1_time"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="9sp"
-                        android:textColor="#AAAAAA" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/tomorrow_course_2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingVertical="2dp"
-                android:visibility="gone">
-
-                <ImageView
-                    android:id="@+id/tomorrow_course_2_indicator"
-                    android:layout_width="3dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="6dp"
-                    android:background="#FF8A65"
-                    android:contentDescription="课程指示器" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tv_tomorrow_course_2_name"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="13sp"
-                        android:textColor="#333333"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-
-                    <TextView
-                        android:id="@+id/tv_tomorrow_course_2_location"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="10sp"
-                        android:textColor="#888888"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-
-                    <TextView
-                        android:id="@+id/tv_tomorrow_course_2_time"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="9sp"
-                        android:textColor="#AAAAAA" />
-                </LinearLayout>
-            </LinearLayout>
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:divider="@null"
+                android:dividerHeight="0dp"
+                android:scrollbars="vertical"
+                android:fadeScrollbars="false"
+                android:listSelector="@android:color/transparent" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

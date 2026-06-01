@@ -230,6 +230,12 @@
                 android:value="course_reminder_keepalive_for_alarm_reliability" />
         </service>
 
+        <!-- 小组件课程列表 RemoteViewsService（用于 ListView 数据加载） -->
+        <service
+            android:name=".widget.WidgetCourseListService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
         <!-- FileProvider for file sharing -->
         <provider
             android:name="androidx.core.content.FileProvider"

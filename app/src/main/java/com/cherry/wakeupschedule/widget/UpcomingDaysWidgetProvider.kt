@@ -35,6 +35,9 @@ class UpcomingDaysWidgetProvider : AppWidgetProvider() {
         for (appWidgetId in appWidgetIds) {
             updateAppWidget(context, appWidgetManager, appWidgetId)
         }
+        // 通知两个 ListView 数据变化
+        appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.lv_today_courses)
+        appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.lv_tomorrow_courses)
         schedulePeriodicUpdate(context)
     }
 
@@ -145,85 +148,39 @@ class UpcomingDaysWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.tv_widget_title, settingsManager.getCurrentSemester())
             views.setTextViewText(R.id.tv_widget_date, dateFormat.format(calendar.time))
 
-            val allCourses = CourseDataManager.getInstance(context).getAllCourses()
-            val currentWeek = calculateCurrentWeek(settingsManager)
-
-            // 今日课程 - 只显示还没上的课
-            val todayDayOfWeek = if (calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) 7 else calendar.get(Calendar.DAY_OF_WEEK) - 1
-            val currentTime = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
-            
-            val todayCourses = allCourses.filter {
-                it.dayOfWeek == todayDayOfWeek && 
-                currentWeek in it.startWeek..it.endWeek && 
-                isCourseInCurrentWeekType(it, currentWeek)
-            }.sortedBy { it.startTime }
-            
-            // 筛选出还没上的课
-            val upcomingTodayCourses = todayCourses.filter { 
-                getCourseStartMinutes(context, it) > currentTime 
+            // 绑定 ListView 到 RemoteViewsService
+            // 今日：仅未上课程
+            val todayIntent = Intent(context, WidgetCourseListService::class.java).apply {
+                putExtra(WidgetCourseListService.EXTRA_SOURCE, WidgetCourseListService.SOURCE_UPCOMING_TODAY)
             }
-            
-            updateDayCourses(context, views, upcomingTodayCourses, "today")
+            views.setRemoteAdapter(R.id.lv_today_courses, todayIntent)
+            views.setEmptyView(R.id.lv_today_courses, android.R.id.empty)
 
-            // 明天课程
-            calendar.add(Calendar.DAY_OF_MONTH, 1)
-            val tomorrowDayOfWeek = if (calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) 7 else calendar.get(Calendar.DAY_OF_WEEK) - 1
-            val tomorrowWeek = calculateWeekForDay(settingsManager, calendar)
-            
-            val tomorrowCourses = allCourses.filter {
-                it.dayOfWeek == tomorrowDayOfWeek && 
-                tomorrowWeek in it.startWeek..it.endWeek && 
-                isCourseInCurrentWeekType(it, tomorrowWeek)
-            }.sortedBy { it.startTime }
-            
-            updateDayCourses(context, views, tomorrowCourses, "tomorrow")
+            // 明日：全部课程
+            val tomorrowIntent = Intent(context, WidgetCourseListService::class.java).apply {
+                putExtra(WidgetCourseListService.EXTRA_SOURCE, WidgetCourseListService.SOURCE_TOMORROW)
+            }
+            views.setRemoteAdapter(R.id.lv_tomorrow_courses, tomorrowIntent)
+            views.setEmptyView(R.id.lv_tomorrow_courses, android.R.id.empty)
 
+            // 点击模板
+            val clickIntentTemplate = PendingIntent.getActivity(
+                context, 20002,
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setPendingIntentTemplate(R.id.lv_today_courses, clickIntentTemplate)
+            views.setPendingIntentTemplate(R.id.lv_tomorrow_courses, clickIntentTemplate)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
+    @Deprecated("使用 ListView + RemoteViewsService 后不再需要此方法")
     private fun updateDayCourses(context: Context, views: RemoteViews, courses: List<Course>, prefix: String) {
-        val colors = SettingsManager(context).getCourseColors()
-
-        when {
-            courses.isEmpty() -> {
-                views.setViewVisibility(getIdByName(context, "${prefix}_course_1"), android.view.View.VISIBLE)
-                views.setViewVisibility(getIdByName(context, "${prefix}_course_2"), android.view.View.GONE)
-                views.setInt(getIdByName(context, "${prefix}_course_1_indicator"), "setBackgroundColor", android.graphics.Color.parseColor("#CCCCCC"))
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_1_name"), "暂无课程")
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_1_location"), "")
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_1_time"), "")
-            }
-            courses.size == 1 -> {
-                val course = courses[0]
-                val color = colors[(course.id % colors.size).toInt()]
-                views.setViewVisibility(getIdByName(context, "${prefix}_course_1"), android.view.View.VISIBLE)
-                views.setViewVisibility(getIdByName(context, "${prefix}_course_2"), android.view.View.GONE)
-                views.setInt(getIdByName(context, "${prefix}_course_1_indicator"), "setBackgroundColor", color)
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_1_name"), course.name)
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_1_location"), course.classroom)
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_1_time"), getCourseTimeString(context, course))
-            }
-            else -> {
-                val course1 = courses[0]
-                val course2 = courses[1]
-                val color1 = colors[(course1.id % colors.size).toInt()]
-                val color2 = colors[(course2.id % colors.size).toInt()]
-                
-                views.setViewVisibility(getIdByName(context, "${prefix}_course_1"), android.view.View.VISIBLE)
-                views.setInt(getIdByName(context, "${prefix}_course_1_indicator"), "setBackgroundColor", color1)
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_1_name"), course1.name)
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_1_location"), course1.classroom)
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_1_time"), getCourseTimeString(context, course1))
-                
-                views.setViewVisibility(getIdByName(context, "${prefix}_course_2"), android.view.View.VISIBLE)
-                views.setInt(getIdByName(context, "${prefix}_course_2_indicator"), "setBackgroundColor", color2)
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_2_name"), course2.name)
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_2_location"), course2.classroom)
-                views.setTextViewText(getIdByName(context, "tv_${prefix}_course_2_time"), getCourseTimeString(context, course2))
-            }
-        }
+        // 此方法保留以保持源码兼容，实际显示已由 WidgetCourseListService 提供
     }
 
     private fun getIdByName(context: Context, name: String): Int {
