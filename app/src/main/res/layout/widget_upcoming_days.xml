@@ -65,9 +65,12 @@
                 android:divider="@null"
                 android:dividerHeight="0dp"
                 android:scrollbars="vertical"
+                android:scrollbarSize="2dp"
                 android:fadeScrollbars="true"
-                android:scrollbarFadeDuration="1500"
-                android:scrollbarStyle="outsideOverlay"
+                android:scrollbarFadeDuration="500"
+                android:scrollbarDefaultDelayBeforeFade="0"
+                android:scrollbarStyle="insideInset"
+                android:overScrollMode="never"
                 android:listSelector="@android:color/transparent" />
         </LinearLayout>
 

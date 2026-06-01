@@ -111,8 +111,24 @@ class WidgetCourseListFactory(
     private fun loadItems() {
         items = try {
             when (source) {
-                WidgetCourseListService.SOURCE_TODAY -> loadTodayCourses(includeFinished = true)
-                WidgetCourseListService.SOURCE_UPCOMING_TODAY -> loadTodayCourses(includeFinished = false)
+                WidgetCourseListService.SOURCE_TODAY -> {
+                    // 今日课程小组件：仅未上的课
+                    val result = loadTodayCoursesEx(includeFinished = false)
+                    when {
+                        result.items.isNotEmpty() -> result.items
+                        result.allFinished -> listOf(emptyItem("今日课程已完成", "明日继续加油", ""))
+                        else -> listOf(emptyItem("今天没有课程", "好好休息", ""))
+                    }
+                }
+                WidgetCourseListService.SOURCE_UPCOMING_TODAY -> {
+                    // 近日课程小组件的"今天"：仅未上的课
+                    val result = loadTodayCoursesEx(includeFinished = false)
+                    when {
+                        result.items.isNotEmpty() -> result.items
+                        result.allFinished -> listOf(emptyItem("今日课程已完成", "明日继续加油", ""))
+                        else -> listOf(emptyItem("今天没有课程", "好好休息", ""))
+                    }
+                }
                 WidgetCourseListService.SOURCE_TOMORROW -> loadTomorrowCourses()
                 else -> emptyList()
             }
@@ -125,8 +141,16 @@ class WidgetCourseListFactory(
     /**
      * 加载今日课程
      * @param includeFinished true: 全部今日课程；false: 仅未上的课
+     * @return 返回 (列表项, 是否所有今日课程已结束, 今日是否有任何课程)
+     *         - 三元组用于上层判断"今日没课" vs "今日课程已完成"
      */
-    private fun loadTodayCourses(includeFinished: Boolean): List<WidgetCourseItem> {
+    private data class TodayLoadResult(
+        val items: List<WidgetCourseItem>,
+        val hasAnyTodayCourse: Boolean,
+        val allFinished: Boolean
+    )
+
+    private fun loadTodayCoursesEx(includeFinished: Boolean): TodayLoadResult {
         val calendar = Calendar.getInstance()
         val dayOfWeek = if (calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) 7
             else calendar.get(Calendar.DAY_OF_WEEK) - 1
@@ -147,14 +171,21 @@ class WidgetCourseListFactory(
             }
             .sortedBy { it.startTime }
 
+        val hasAnyTodayCourse = todayCourses.isNotEmpty()
+        val allFinished = hasAnyTodayCourse && todayCourses.all { getCourseEndMinutes(context, it) <= currentTime }
+
         val filtered = if (includeFinished) todayCourses
         else todayCourses.filter { getCourseEndMinutes(context, it) > currentTime }
 
         if (filtered.isEmpty()) {
-            return listOf(emptyItem("今日没有课程", "", ""))
+            return TodayLoadResult(
+                items = emptyList(),
+                hasAnyTodayCourse = hasAnyTodayCourse,
+                allFinished = allFinished
+            )
         }
 
-        return filtered.map { course ->
+        val items = filtered.map { course ->
             val color = colors[(course.id % colors.size).toInt()]
             WidgetCourseItem(
                 id = course.id,
@@ -164,6 +195,7 @@ class WidgetCourseListFactory(
                 color = color
             )
         }
+        return TodayLoadResult(items = items, hasAnyTodayCourse = hasAnyTodayCourse, allFinished = allFinished)
     }
 
     /**
