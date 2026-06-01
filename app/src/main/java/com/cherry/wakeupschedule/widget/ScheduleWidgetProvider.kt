@@ -167,8 +167,8 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
                 return
             }
             val endSeconds = todayEndCourses[0].first * 60
-            val delayMillis = (endSeconds - currentTimeSeconds) * 1000L
-            if (delayMillis <= 0) { cancelCourseEndUpdate(context); triggerWidgetUpdate(context); return }
+            val delayMillis = (endSeconds - currentTimeSeconds) * 1000L + 5000L
+            if (delayMillis <= 5000L) { cancelCourseEndUpdate(context); triggerWidgetUpdate(context); return }
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val pendingIntent = PendingIntent.getBroadcast(context, WIDGET_COURSE_END_REQUEST_CODE, Intent(context, WidgetCourseEndReceiver::class.java),

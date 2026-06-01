@@ -242,14 +242,48 @@ class MinimalWidgetPeriodicReceiver : BroadcastReceiver() {
 class MinimalWidgetCourseEndReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let {
+            val appWidgetManager = AppWidgetManager.getInstance(it)
             MinimalWidgetProvider().onUpdate(
                 it,
-                AppWidgetManager.getInstance(it),
-                AppWidgetManager.getInstance(it).getAppWidgetIds(
+                appWidgetManager,
+                appWidgetManager.getAppWidgetIds(
                     ComponentName(it, MinimalWidgetProvider::class.java)
                 )
             )
+            ScheduleWidgetProvider().onUpdate(
+                it,
+                appWidgetManager,
+                appWidgetManager.getAppWidgetIds(
+                    ComponentName(it, ScheduleWidgetProvider::class.java)
+                )
+            )
             ScheduleWidgetUpdateService.scheduleNextUpdate(it)
+        }
+    }
+}
+
+/**
+ * 最小化小组件倒计时安全更新接收器
+ * 当倒计时即将归零时触发，确保小组件及时切换到"当前没课"状态
+ */
+class MinimalWidgetSafetyReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        context?.let {
+            val appWidgetManager = AppWidgetManager.getInstance(it)
+            MinimalWidgetProvider().onUpdate(
+                it,
+                appWidgetManager,
+                appWidgetManager.getAppWidgetIds(
+                    ComponentName(it, MinimalWidgetProvider::class.java)
+                )
+            )
+            ScheduleWidgetProvider().onUpdate(
+                it,
+                appWidgetManager,
+                appWidgetManager.getAppWidgetIds(
+                    ComponentName(it, ScheduleWidgetProvider::class.java)
+                )
+            )
         }
     }
 }

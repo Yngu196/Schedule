@@ -182,6 +182,11 @@
             android:name=".widget.MinimalWidgetTickReceiver"
             android:exported="false" />
 
+        <!-- Minimal小组件倒计时安全更新接收器 -->
+        <receiver
+            android:name=".widget.MinimalWidgetSafetyReceiver"
+            android:exported="false" />
+
         <!-- 近日课程小组件周期性更新接收器 -->
         <receiver
             android:name=".widget.UpcomingDaysPeriodicReceiver"

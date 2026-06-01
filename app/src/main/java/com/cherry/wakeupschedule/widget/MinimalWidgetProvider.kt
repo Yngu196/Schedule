@@ -30,6 +30,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         private const val WIDGET_MINIMAL_PERIODIC_REQUEST_CODE = 10004
         private const val WIDGET_MINIMAL_COURSE_END_REQUEST_CODE = 10006
         private const val WIDGET_MINIMAL_TICK_REQUEST_CODE = 10007
+        private const val WIDGET_MINIMAL_SAFETY_REQUEST_CODE = 10008
         private const val MINIMAL_PERIODIC_UPDATE_INTERVAL = 15 * 60 * 1000L
         private const val MINIMAL_TICK_INTERVAL = 30 * 1000L
 
@@ -70,6 +71,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
             cancelPeriodicUpdate(context)
             cancelMinimalCourseEndUpdate(context)
             cancelMinimalTick(context)
+            cancelCountdownSafetyUpdate(context)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -160,8 +162,8 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 return
             }
             val endSeconds = todayEndCourses[0].first * 60
-            val delayMillis = (endSeconds - currentTimeSeconds) * 1000L
-            if (delayMillis <= 0) {
+            val delayMillis = (endSeconds - currentTimeSeconds) * 1000L + 5000L
+            if (delayMillis <= 5000L) {
                 cancelMinimalCourseEndUpdate(context)
                 triggerWidgetUpdate(context)
                 return
@@ -280,7 +282,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
             val currentCourse = todayCourses.find { course ->
                 val startMinutes = getCourseStartMinutes(context, course)
                 val endMinutes = getCourseEndMinutes(context, course)
-                currentTime in startMinutes..endMinutes
+                currentTime >= startMinutes && currentTime < endMinutes
             }
 
             when {
@@ -290,9 +292,18 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                     views.setTextViewText(R.id.tv_course_time, "后下课")
 
                     val endSeconds = getCourseEndMinutes(context, currentCourse) * 60
-                    val remainingMillis = ((endSeconds - currentTimeSeconds).coerceAtLeast(1)) * 1000L
+                    val remainingSeconds = (endSeconds - currentTimeSeconds).coerceAtLeast(0)
+                    val remainingMillis = remainingSeconds * 1000L
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    if (remainingSeconds < 60) {
+                        views.setViewVisibility(R.id.chronometer_countdown, android.view.View.GONE)
+                        views.setViewVisibility(R.id.tv_countdown, android.view.View.VISIBLE)
+                        val mins = remainingMillis / 60000
+                        val secs = (remainingMillis % 60000) / 1000
+                        views.setTextViewText(R.id.tv_countdown, "%02d:%02d".format(mins, secs))
+                        cancelMinimalTick(context)
+                        scheduleCountdownSafetyUpdate(context, remainingMillis + 2000L)
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         views.setViewVisibility(R.id.tv_countdown, android.view.View.GONE)
                         views.setViewVisibility(R.id.chronometer_countdown, android.view.View.VISIBLE)
                         views.setChronometerCountDown(R.id.chronometer_countdown, true)
@@ -303,6 +314,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                             true
                         )
                         cancelMinimalTick(context)
+                        cancelCountdownSafetyUpdate(context)
                     } else {
                         views.setViewVisibility(R.id.chronometer_countdown, android.view.View.GONE)
                         views.setViewVisibility(R.id.tv_countdown, android.view.View.VISIBLE)
@@ -310,6 +322,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                         val secs = (remainingMillis % 60000) / 1000
                         views.setTextViewText(R.id.tv_countdown, "%02d:%02d".format(mins, secs))
                         scheduleMinimalTick(context)
+                        cancelCountdownSafetyUpdate(context)
                     }
                 }
                 else -> {
@@ -320,6 +333,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                     views.setViewVisibility(R.id.tv_countdown, android.view.View.VISIBLE)
                     views.setTextViewText(R.id.tv_countdown, "--")
                     cancelMinimalTick(context)
+                    cancelCountdownSafetyUpdate(context)
                 }
             }
         } catch (e: Exception) {
@@ -373,6 +387,58 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 context,
                 WIDGET_MINIMAL_TICK_REQUEST_CODE,
                 Intent(context, MinimalWidgetTickReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * 安排倒计时结束后的安全更新
+     * 当剩余时间不足60秒时使用文本显示，并在倒计时结束后触发一次更新以避免负数时间
+     */
+    private fun scheduleCountdownSafetyUpdate(context: Context, delayMillis: Long) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_MINIMAL_SAFETY_REQUEST_CODE,
+                Intent(context, MinimalWidgetSafetyReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+            if (delayMillis > 0) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        System.currentTimeMillis() + delayMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.set(
+                        AlarmManager.RTC_WAKEUP,
+                        System.currentTimeMillis() + delayMillis,
+                        pendingIntent
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * 取消倒计时安全更新
+     */
+    private fun cancelCountdownSafetyUpdate(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_MINIMAL_SAFETY_REQUEST_CODE,
+                Intent(context, MinimalWidgetSafetyReceiver::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             alarmManager.cancel(pendingIntent)
