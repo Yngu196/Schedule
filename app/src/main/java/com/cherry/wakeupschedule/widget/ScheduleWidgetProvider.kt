@@ -40,6 +40,8 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (appWidgetId in appWidgetIds) updateAppWidget(context, appWidgetManager, appWidgetId)
+        // 通知 ListView 数据可能变化，重新拉取
+        appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.lv_today_courses)
         scheduleNextCourseEndUpdate(context)
         schedulePeriodicUpdate(context)
     }
@@ -140,11 +142,24 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.tv_widget_date, "${calendar.get(Calendar.MONTH) + 1}.${calendar.get(Calendar.DAY_OF_MONTH)} ${arrayOf("", "周一", "周二", "周三", "周四", "周五", "周六", "周日")[dayOfWeek]}")
             views.setTextViewText(R.id.tv_widget_week, "第${calculateCurrentWeek(settingsManager)}周")
 
-            val allCourses = CourseDataManager.getInstance(context).getAllCourses()
-            val currentWeek = calculateCurrentWeek(settingsManager)
-            val todayCourses = allCourses.filter { it.dayOfWeek == dayOfWeek && currentWeek in it.startWeek..it.endWeek && isCourseInCurrentWeekType(it, currentWeek) }
-            val upcomingCourses = todayCourses.filter { getCourseEndTimeInMinutes(context, it) > currentTime }.sortedBy { it.startTime }
-            updateCourseDisplay(context, views, upcomingCourses, todayCourses)
+            // 绑定 ListView 到 RemoteViewsService，显示完整今日课程列表（包含已结束）
+            // 使用 data Uri 让系统识别为唯一绑定
+            val todayIntent = Intent(context, WidgetCourseListService::class.java).apply {
+                putExtra(WidgetCourseListService.EXTRA_SOURCE, WidgetCourseListService.SOURCE_TODAY)
+                data = android.net.Uri.parse("widget://course-list/today")
+            }
+            views.setRemoteAdapter(R.id.lv_today_courses, todayIntent)
+            views.setEmptyView(R.id.lv_today_courses, android.R.id.empty)
+
+            // 设置每行的点击 PendingIntent（跳转到主应用）
+            val clickIntentTemplate = PendingIntent.getActivity(
+                context, 20001,
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setPendingIntentTemplate(R.id.lv_today_courses, clickIntentTemplate)
         } catch (e: Exception) { e.printStackTrace() }
     }
 
@@ -196,45 +211,16 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
         if (appWidgetIds.isNotEmpty()) onUpdate(context, appWidgetManager, appWidgetIds)
     }
 
-    // 更新课程显示区域
+    // 更新课程显示区域（已废弃：现在使用 ListView + RemoteViewsService 自动填充）
+    @Deprecated("使用 ListView + RemoteViewsService 后不再需要此方法")
     private fun updateCourseDisplay(context: Context, views: RemoteViews, upcomingCourses: List<com.cherry.wakeupschedule.model.Course>, allTodayCourses: List<com.cherry.wakeupschedule.model.Course>) {
-        when {
-            upcomingCourses.isEmpty() -> {
-                views.setViewVisibility(R.id.course_item_1, android.view.View.VISIBLE); views.setViewVisibility(R.id.course_item_2, android.view.View.GONE)
-                views.setInt(R.id.course_indicator_1, "setBackgroundColor", if (allTodayCourses.isEmpty()) Color.parseColor("#CCCCCC") else Color.parseColor("#4CAF50"))
-                views.setTextViewText(R.id.tv_course_name_1, if (allTodayCourses.isEmpty()) "今天没有课程" else "今日课程已完成")
-                views.setTextViewText(R.id.tv_course_location_1, if (allTodayCourses.isEmpty()) "好好休息吧" else "共${allTodayCourses.size}节课")
-                views.setTextViewText(R.id.tv_course_time_1, if (allTodayCourses.isEmpty()) "" else "明天继续加油！")
-            }
-            upcomingCourses.size == 1 -> {
-                val course = upcomingCourses[0]
-                val color = SettingsManager(context).getCourseColors()[(course.id % SettingsManager(context).getCourseColors().size).toInt()]
-                views.setViewVisibility(R.id.course_item_1, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_1, "setBackgroundColor", color)
-                views.setTextViewText(R.id.tv_course_name_1, course.name); views.setTextViewText(R.id.tv_course_location_1, course.classroom); views.setTextViewText(R.id.tv_course_time_1, getCourseTimeString(context, course))
-                views.setViewVisibility(R.id.course_item_2, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_2, "setBackgroundColor", Color.parseColor("#CCCCCC"))
-                views.setTextViewText(R.id.tv_course_name_2, "今日最后一节课"); views.setTextViewText(R.id.tv_course_location_2, "之后没有课程了"); views.setTextViewText(R.id.tv_course_time_2, "")
-            }
-            else -> {
-                val (c1, c2) = upcomingCourses[0] to upcomingCourses[1]
-                val colors = SettingsManager(context).getCourseColors()
-                views.setViewVisibility(R.id.course_item_1, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_1, "setBackgroundColor", colors[(c1.id % colors.size).toInt()])
-                views.setTextViewText(R.id.tv_course_name_1, c1.name); views.setTextViewText(R.id.tv_course_location_1, c1.classroom); views.setTextViewText(R.id.tv_course_time_1, getCourseTimeString(context, c1))
-                views.setViewVisibility(R.id.course_item_2, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_2, "setBackgroundColor", colors[(c2.id % colors.size).toInt()])
-                views.setTextViewText(R.id.tv_course_name_2, c2.name); views.setTextViewText(R.id.tv_course_location_2, c2.classroom); views.setTextViewText(R.id.tv_course_time_2, getCourseTimeString(context, c2))
-            }
-        }
+        // 此方法保留以保持源码兼容，实际显示已由 WidgetCourseListService 提供
     }
 
     private fun getCourseEndTimeInMinutes(context: Context, course: com.cherry.wakeupschedule.model.Course): Int = try {
         val slot = TimeTableManager.getInstance(context).getTimeSlots().find { it.node == course.endTime }
         if (slot != null) { val p = slot.endTime.split(":"); p[0].toInt() * 60 + p[1].toInt() } else (8 + course.endTime) * 60 + 45
     } catch (e: Exception) { (8 + course.endTime) * 60 + 45 }
-
-    private fun getCourseTimeString(context: Context, course: com.cherry.wakeupschedule.model.Course): String = try {
-        val slots = TimeTableManager.getInstance(context).getTimeSlots()
-        val start = slots.find { it.node == course.startTime }; val end = slots.find { it.node == course.endTime }
-        if (start != null && end != null) "${start.startTime} - ${end.endTime}" else "第${course.startTime}-${course.endTime}节"
-    } catch (e: Exception) { "第${course.startTime}-${course.endTime}节" }
 
     private fun calculateCurrentWeek(settingsManager: SettingsManager): Int {
         val startDate = settingsManager.getSemesterStartDate()

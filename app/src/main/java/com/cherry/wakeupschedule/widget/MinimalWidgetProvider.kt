@@ -314,7 +314,8 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                             true
                         )
                         cancelMinimalTick(context)
-                        cancelCountdownSafetyUpdate(context)
+                        // Chronometer 归零后会继续走成负数，安排安全更新在倒计时结束时刷新小组件
+                        scheduleCountdownSafetyUpdate(context, remainingMillis + 1000L)
                     } else {
                         views.setViewVisibility(R.id.chronometer_countdown, android.view.View.GONE)
                         views.setViewVisibility(R.id.tv_countdown, android.view.View.VISIBLE)
@@ -322,7 +323,8 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                         val secs = (remainingMillis % 60000) / 1000
                         views.setTextViewText(R.id.tv_countdown, "%02d:%02d".format(mins, secs))
                         scheduleMinimalTick(context)
-                        cancelCountdownSafetyUpdate(context)
+                        // 同时安排安全更新，确保在课程结束时立即刷新，避免长时间显示陈旧/负数倒计时
+                        scheduleCountdownSafetyUpdate(context, remainingMillis + 1000L)
                     }
                 }
                 else -> {

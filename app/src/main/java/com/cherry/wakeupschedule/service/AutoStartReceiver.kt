@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import com.cherry.wakeupschedule.util.DebugLogger
 import kotlinx.coroutines.CoroutineScope
@@ -95,10 +96,23 @@ class AutoStartReceiver : BroadcastReceiver() {
         )
 
         try {
-            alarmManager.setAlarmClock(
-                AlarmManager.AlarmClockInfo(shutdownTime, null),
-                pendingIntent
+            AlarmService.scheduleAlarmWithFallback(
+                context,
+                alarmManager,
+                shutdownTime,
+                pendingIntent,
+                "autoshutdown"
             )
+        } catch (e: SecurityException) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, shutdownTime, pendingIntent)
+                } else {
+                    alarmManager.set(AlarmManager.RTC_WAKEUP, shutdownTime, pendingIntent)
+                }
+            } catch (e2: Exception) {
+                DebugLogger.logError("Failed to schedule shutdown alarm (fallback)", e2)
+            }
         } catch (e: Exception) {
             DebugLogger.logError("Failed to schedule shutdown alarm", e)
         }

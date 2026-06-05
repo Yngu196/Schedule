@@ -29,6 +29,7 @@ class UpdateService(private val context: Context) {
     companion object {
         private const val TAG = "UpdateService"
         private const val GITHUB_API_URL = "https://api.github.com/repos/Yngu196/Schedule/releases"
+        private const val GITCODE_URL = "https://gitcode.com/2401_87059416/Schedule/releases/"
         private const val LANZOU_URL = "https://wwbph.lanzn.com/b019vqfy9c"
     }
 
@@ -334,6 +335,11 @@ class UpdateService(private val context: Context) {
         
         dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download_original).setOnClickListener {
             openDownloadPage(url)
+            dialog.dismiss()
+        }
+
+        dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download_gitcode).setOnClickListener {
+            openDownloadWithSystemBrowser(GITCODE_URL)
             dialog.dismiss()
         }
 
