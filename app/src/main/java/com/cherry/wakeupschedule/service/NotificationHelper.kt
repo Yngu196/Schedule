@@ -168,6 +168,24 @@ class NotificationHelper(private val context: Context) {
     }
 
     /**
+     * 取消某门课程在通知栏中所有已展示的通知
+     * 通知ID在 AlarmReceiver 中按规则生成：
+     *  - 无周次时：courseName.hashCode()
+     *  - 有周次时：("$courseName#$week").hashCode()
+     * 删除/修改课程时必须同步清理通知栏，否则旧通知会一直残留
+     */
+    fun cancelCourseNotifications(courseName: String, maxWeeks: Int = 20) {
+        if (courseName.isEmpty()) return
+        val nm = NotificationManagerCompat.from(context)
+        // 清理 setCourseAlarm 触发的通知（无周次）
+        nm.cancel(courseName.hashCode())
+        // 清理 registerCourseNotificationsForSemester 触发的每周通知
+        for (week in 1..maxWeeks) {
+            nm.cancel("$courseName#$week".hashCode())
+        }
+    }
+
+    /**
      * 根据课程ID获取通知ID
      */
     fun getNotificationId(courseId: Long): Int {

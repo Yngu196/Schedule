@@ -268,6 +268,8 @@ class AddCourseActivity : AppCompatActivity() {
         }
 
         if (existingCourseExtra != null) {
+            // 先取消旧课程的闹钟与已展示的通知，避免改名/改信息后旧通知残留
+            App.instance.alarmService?.cancelCourseAlarm(existingCourseExtra)
             viewModel.updateCourse(course)
             Toast.makeText(this, "课程更新成功", Toast.LENGTH_SHORT).show()
         } else {

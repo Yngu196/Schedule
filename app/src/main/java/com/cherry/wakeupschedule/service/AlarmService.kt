@@ -180,6 +180,8 @@ class AlarmService(private val context: Context) {
 
         // 同时取消WorkManager的提醒
         ExactAlarmWorker.cancelReminder(context, course.id)
+        // 同时清理通知栏中已展示的该课程通知，避免删除/修改后旧通知残留
+        notificationHelper.cancelCourseNotifications(course.name)
         Log.d("AlarmService", "Cancelled alarm for ${course.name}")
     }
 

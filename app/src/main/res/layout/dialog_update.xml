@@ -57,10 +57,20 @@
             android:background="?attr/selectableItemBackground" />
 
         <TextView
+            android:id="@+id/btn_download_gitcode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GitCode 下载 (国内推荐)"
+            android:textSize="14sp"
+            android:textColor="#2196F3"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackground" />
+
+        <TextView
             android:id="@+id/btn_download_lanzou"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="蓝奏云下载 (国内推荐)"
+            android:text="蓝奏云下载"
             android:textSize="14sp"
             android:textColor="#2196F3"
             android:padding="12dp"
