@@ -143,12 +143,12 @@ class MinimalWidgetProvider : AppWidgetProvider() {
 
     /**
      * 安排下一个课程结束时的更新
+     * 使用绝对时间调度（基于课程实际下课时刻），确保无论何时调用都能准确触发
      */
     private fun scheduleNextCourseEndUpdate(context: Context) {
         try {
             val calendar = Calendar.getInstance()
             val dayOfWeek = if (calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) 7 else calendar.get(Calendar.DAY_OF_WEEK) - 1
-            val currentTimeSeconds = calendar.get(Calendar.HOUR_OF_DAY) * 3600 + calendar.get(Calendar.MINUTE) * 60 + calendar.get(Calendar.SECOND)
             val currentTimeMinutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
             val currentWeek = calculateCurrentWeek(SettingsManager(context))
 
@@ -161,9 +161,21 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 cancelMinimalCourseEndUpdate(context)
                 return
             }
-            val endSeconds = todayEndCourses[0].first * 60
-            val delayMillis = (endSeconds - currentTimeSeconds) * 1000L + 5000L
-            if (delayMillis <= 5000L) {
+
+            // 使用绝对时间：计算出今天课程结束的精确时刻，而非相对延迟
+            // 这样即使上课中途刷新了小组件，闹钟触发时间也不会偏移
+            val endMinutes = todayEndCourses[0].first
+            val calendarEnd = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+                add(Calendar.MINUTE, endMinutes)
+            }
+            val targetTriggerMillis = calendarEnd.timeInMillis + 2000L // 下课后2秒触发，给系统一点处理时间
+
+            if (targetTriggerMillis <= System.currentTimeMillis() + 3000L) {
+                // 距离触发时间已不足3秒，直接立即刷新，避免闹钟延迟导致不更新
                 cancelMinimalCourseEndUpdate(context)
                 triggerWidgetUpdate(context)
                 return
@@ -177,9 +189,9 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, targetTriggerMillis, pendingIntent)
             } else {
-                alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
+                alarmManager.set(AlarmManager.RTC_WAKEUP, targetTriggerMillis, pendingIntent)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -302,7 +314,8 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                         val secs = (remainingMillis % 60000) / 1000
                         views.setTextViewText(R.id.tv_countdown, "%02d:%02d".format(mins, secs))
                         cancelMinimalTick(context)
-                        scheduleCountdownSafetyUpdate(context, remainingMillis + 2000L)
+                        // 安全更新在倒计时归零时触发，避免显示负数
+                        scheduleCountdownSafetyUpdate(context, remainingMillis.coerceAtLeast(1000L))
                     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         views.setViewVisibility(R.id.tv_countdown, android.view.View.GONE)
                         views.setViewVisibility(R.id.chronometer_countdown, android.view.View.VISIBLE)
@@ -314,8 +327,8 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                             true
                         )
                         cancelMinimalTick(context)
-                        // Chronometer 归零后会继续走成负数，安排安全更新在倒计时结束时刷新小组件
-                        scheduleCountdownSafetyUpdate(context, remainingMillis + 1000L)
+                        // Chronometer 归零后会继续走成负数，安排安全更新在倒计时归零时刷新小组件
+                        scheduleCountdownSafetyUpdate(context, remainingMillis)
                     } else {
                         views.setViewVisibility(R.id.chronometer_countdown, android.view.View.GONE)
                         views.setViewVisibility(R.id.tv_countdown, android.view.View.VISIBLE)
@@ -323,8 +336,8 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                         val secs = (remainingMillis % 60000) / 1000
                         views.setTextViewText(R.id.tv_countdown, "%02d:%02d".format(mins, secs))
                         scheduleMinimalTick(context)
-                        // 同时安排安全更新，确保在课程结束时立即刷新，避免长时间显示陈旧/负数倒计时
-                        scheduleCountdownSafetyUpdate(context, remainingMillis + 1000L)
+                        // 安全更新在倒计时归零时触发，确保课程结束时立即刷新
+                        scheduleCountdownSafetyUpdate(context, remainingMillis)
                     }
                 }
                 else -> {
