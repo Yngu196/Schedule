@@ -1,12 +1,12 @@
 # Schedule 课表
 
-基于 WakeUp 课程表 3.612 魔改重构的 Android 课表应用。
+基于 WakeUp 课程表的Kotlin重构版的 3.612 版本魔改重构的 Android 课表应用。
 
 🌐 [官方网站](https://yngu196.github.io/Schedule/)
 
 ## 声明
 
-本项目是对 [WakeUp课程表](https://github.com/YZune/WakeUpSchedule) 3.612 版本的魔改重构项目。
+本项目是对 [WakeUp课程表的Kotlin重构版]的3.612 版本的魔改重构项目。
 
 教务网页解析的部分使用了 [CourseAdapter](https://github.com/YZune/CourseAdapter) 库。
 
