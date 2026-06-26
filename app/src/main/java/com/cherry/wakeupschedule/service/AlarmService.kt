@@ -19,6 +19,12 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 
 /**
+ * 用于跳过 setAlarmClock 的控制异常
+ * 非最近闹钟抛出此异常以直接降级到 setExactAndAllowWhileIdle，避免覆盖全局唯一的 setAlarmClock
+ */
+private class SkipSetAlarmClockException : Exception()
+
+/**
  * 闹钟服务
  * 负责课程提醒闹钟的设置、取消和管理
  * 使用系统AlarmManager实现精确闹钟提醒
@@ -55,15 +61,15 @@ class AlarmService(private val context: Context) {
 
     /**
      * 设置闹钟的兜底实现：根据权限选择最可靠的 API
-     * 优先级：setAlarmClock > setExactAndAllowWhileIdle > setExact > setAndAllowWhileIdle > set
-     * setAlarmClock 在 Doze 模式下也能保证触发，是通知类场景的最佳选择
+     * 仅对最近一个闹钟使用 setAlarmClock（全局唯一），其他使用 setExactAndAllowWhileIdle
      */
     private fun scheduleAlarmWithFallback(
         triggerAtMillis: Long,
         pendingIntent: PendingIntent,
-        tag: String
+        tag: String,
+        isNearestAlarm: Boolean = false
     ): Boolean {
-        return scheduleAlarmWithFallback(context, alarmManager, triggerAtMillis, pendingIntent, tag)
+        return scheduleAlarmWithFallback(context, alarmManager, triggerAtMillis, pendingIntent, tag, isNearestAlarm)
     }
 
     /**
@@ -265,23 +271,74 @@ class AlarmService(private val context: Context) {
 
         /**
          * 静态兜底实现：使用最可靠的 API 设置闹钟
-         * 优先级：setAlarmClock > setExactAndAllowWhileIdle > setExact > setAndAllowWhileIdle > set
+         * 优先级（仅最近一个闹钟）：setAlarmClock > setExactAndAllowWhileIdle > setExact > setAndAllowWhileIdle > set
+         * 其他闹钟（非最近）：setExactAndAllowWhileIdle > setExact > setAndAllowWhileIdle > set
+         * 注意：setAlarmClock 全局只能存在 1 个，必须仅用于最近即将触发的闹钟
          */
         fun scheduleAlarmWithFallback(
             context: Context,
             alarmManager: AlarmManager,
             triggerAtMillis: Long,
             pendingIntent: PendingIntent,
-            tag: String
+            tag: String,
+            isNearestAlarm: Boolean = false
         ): Boolean {
             return try {
-                // 1) 优先使用 setAlarmClock：系统在状态栏显示下一个闹钟并以最高优先级触发
-                alarmManager.setAlarmClock(
-                    AlarmManager.AlarmClockInfo(triggerAtMillis, null),
-                    pendingIntent
-                )
-                Log.d("AlarmService", "闹钟($tag)使用 setAlarmClock 设置，时间=${java.util.Date(triggerAtMillis)}")
+                if (isNearestAlarm) {
+                    // 仅对最近一个闹钟使用 setAlarmClock：系统在状态栏显示下一个闹钟并以最高优先级触发
+                    alarmManager.setAlarmClock(
+                        AlarmManager.AlarmClockInfo(triggerAtMillis, null),
+                        pendingIntent
+                    )
+                    Log.d("AlarmService", "闹钟($tag)使用 setAlarmClock 设置（最近闹钟），时间=${java.util.Date(triggerAtMillis)}")
+                } else {
+                    // 非最近闹钟跳过 setAlarmClock，直接降级到 setExactAndAllowWhileIdle，避免覆盖最近的 setAlarmClock
+                    throw SkipSetAlarmClockException()
+                }
                 true
+            } catch (e: SkipSetAlarmClockException) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerAtMillis,
+                            pendingIntent
+                        )
+                    } else {
+                        alarmManager.setExact(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerAtMillis,
+                            pendingIntent
+                        )
+                    }
+                    Log.d("AlarmService", "闹钟($tag)使用 setExactAndAllowWhileIdle 设置，时间=${java.util.Date(triggerAtMillis)}")
+                    true
+                } catch (e2: SecurityException) {
+                    Log.w("AlarmService", "setExact 权限被拒绝($tag)，降级到 setAndAllowWhileIdle", e2)
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setAndAllowWhileIdle(
+                                AlarmManager.RTC_WAKEUP,
+                                triggerAtMillis,
+                                pendingIntent
+                            )
+                        } else {
+                            alarmManager.set(
+                                AlarmManager.RTC_WAKEUP,
+                                triggerAtMillis,
+                                pendingIntent
+                            )
+                        }
+                        Log.d("AlarmService", "闹钟($tag)使用 setAndAllowWhileIdle 兜底设置")
+                        true
+                    } catch (e3: Exception) {
+                        Log.e("AlarmService", "闹钟($tag)所有 set 方法都失败", e3)
+                        false
+                    }
+                } catch (e2: Exception) {
+                    Log.e("AlarmService", "闹钟($tag)setExact 失败", e2)
+                    false
+                }
             } catch (e: SecurityException) {
                 Log.w("AlarmService", "setAlarmClock 权限被拒绝($tag)，降级到 setExactAndAllowWhileIdle", e)
                 try {
@@ -423,86 +480,24 @@ class AlarmService(private val context: Context) {
         val allCourses = CourseDataManager.getInstance(context).getAllCourses()
         val semesterEndWeek = allCourses.maxOfOrNull { it.endWeek } ?: 20
 
+        val currentWeek = getCurrentWeek()
+
         // 为每门课程的每周安排通知
         allCourses.forEach { course ->
             if (course.alarmEnabled) {
-                registerCourseNotificationsForSemester(course, semesterEndWeek)
-            }
-        }
-        Log.d("AlarmService", "Registered all notifications for ${allCourses.size} courses for semester")
-    }
-
-    /**
-     * 为课程的整个学期安排通知
-     *
-     * @param course 课程
-     * @param semesterEndWeek 学期结束周
-     */
-    private fun registerCourseNotificationsForSemester(course: Course, semesterEndWeek: Int) {
-        val currentWeek = getCurrentWeek()
-
-        // 遍历课程的周数范围
-        for (week in course.startWeek..Math.min(course.endWeek, semesterEndWeek)) {
-            // 检查单双周
-            if (!isWeekTypeMatched(course, week)) continue
-
-            // 使用学期开始日期精确计算闹钟时间
-            var alarmTime = calculateAlarmTimeMillis(course, week, course.alarmMinutesBefore)
-
-            // 如果学期开始日期未设置，计算时间为0，跳过所有闹钟
-            if (alarmTime == 0L) {
-                Log.w("AlarmService", "Semester start date not set, skipping all alarms for ${course.name}")
-                break
-            }
-
-            // 检查这一天是否是节假日，如果是且设置了隐藏，则跳过
-            if (settingsManager.isHideHolidayCourses()) {
-                val calendar = Calendar.getInstance().apply { timeInMillis = alarmTime }
-                if (holidayManager.isHoliday(calendar)) {
-                    Log.d("AlarmService", "Skipping alarm for ${course.name} on ${java.util.Date(alarmTime)} because it's a holiday")
-                    continue
-                }
-            }
-
-            // 如果时间已过且是当前周，尝试补救而非直接推到下周
-            if (alarmTime <= System.currentTimeMillis()) {
-                if (week == currentWeek) {
-                    // 检查是否在可补救窗口内：闹钟预期触发时间 + 课程时长 范围内
-                    // 例如上课前30分钟闹钟本应在9:30触发，课程10:00开始，现在9:45刷新
-                    // 如果上课还没开始，通过 WorkManager 立即补救通知
-                    val courseStartTime = calculateAlarmTimeMillis(course, week, 0)
-                    if (courseStartTime > 0L && System.currentTimeMillis() < courseStartTime) {
-                        Log.w("AlarmService", "补救本周 ${course.name} Week$week 的闹钟：闹钟时间已过但课程尚未开始，通过 WorkManager 立即通知")
-                        try {
-                            // 使用独立 workName="course_catchup_{id}"，不会被后续标准备份（REPLACE）覆盖
-                            ExactAlarmWorker.scheduleImmediate(context, course)
-                        } catch (e: Exception) {
-                            Log.e("AlarmService", "补救 WorkManager 调度失败", e)
-                        }
-                    }
-                    // 同时为下周安排闹钟
-                    alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
-                    if (alarmTime <= System.currentTimeMillis()) continue
-                } else {
-                    continue
-                }
-            }
-
-            // 创建通知Intent
-            val intent = Intent(context, AlarmReceiver::class.java).apply {
-                putExtra("course_name", course.name)
-                putExtra("course_teacher", course.teacher)
-                putExtra("course_location", course.classroom)
-                putExtra("course", course)
-                putExtra("notification_week", week)
-            }
-
+                collectValidAlarmTimes(course, semesterEndWeek).forEach { (alarmTime, week) ->
             // 使用课程ID和周数生成唯一的通知ID（统一公式）
             val notificationId = NotificationHelper.generateNotificationId(course.id, week)
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 notificationId,
-                intent,
+                Intent(context, AlarmReceiver::class.java).apply {
+                    putExtra("course_name", course.name)
+                    putExtra("course_teacher", course.teacher)
+                    putExtra("course_location", course.classroom)
+                    putExtra("course", course)
+                    putExtra("notification_week", week)
+                },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
@@ -551,7 +546,57 @@ class AlarmService(private val context: Context) {
                 scheduleAlarmWithFallback(autoStartTime, autoStartPendingIntent, "autostart#${course.name}#w${week}")
                 Log.d("AlarmService", "Registered auto-start for ${course.name} week $week at ${java.util.Date(autoStartTime)}")
             }
+                }
+            }
         }
+        Log.d("AlarmService", "Registered all notifications for ${allCourses.size} courses for semester")
+    }
+
+    /**
+     * 收集单门课程整个学期所有有效的闹钟时间
+     */
+    private fun collectValidAlarmTimes(course: Course, semesterEndWeek: Int): List<Pair<Long, Int>> {
+        val currentWeek = getCurrentWeek()
+        val result = mutableListOf<Pair<Long, Int>>()
+
+        for (week in course.startWeek..Math.min(course.endWeek, semesterEndWeek)) {
+            if (!isWeekTypeMatched(course, week)) continue
+
+            var alarmTime = calculateAlarmTimeMillis(course, week, course.alarmMinutesBefore)
+            if (alarmTime == 0L) break
+
+            if (settingsManager.isHideHolidayCourses()) {
+                val calendar = Calendar.getInstance().apply { timeInMillis = alarmTime }
+                if (holidayManager.isHoliday(calendar)) continue
+            }
+
+            // 如果时间已过且是当前周，尝试补救而非直接推到下周
+            if (alarmTime <= System.currentTimeMillis()) {
+                if (week == currentWeek) {
+                    // 检查是否在可补救窗口内：闹钟预期触发时间 + 课程时长 范围内
+                    // 例如上课前30分钟闹钟本应在9:30触发，课程10:00开始，现在9:45刷新
+                    // 如果上课还没开始，通过 WorkManager 立即补救通知
+                    val courseStartTime = calculateAlarmTimeMillis(course, week, 0)
+                    if (courseStartTime > 0L && System.currentTimeMillis() < courseStartTime) {
+                        Log.w("AlarmService", "补救本周 ${course.name} Week$week 的闹钟：闹钟时间已过但课程尚未开始，通过 WorkManager 立即通知")
+                        try {
+                            // 使用独立 workName="course_catchup_{id}"，不会被后续标准备份（REPLACE）覆盖
+                            ExactAlarmWorker.scheduleImmediate(context, course)
+                        } catch (e: Exception) {
+                            Log.e("AlarmService", "补救 WorkManager 调度失败", e)
+                        }
+                    }
+                    // 同时为下周安排闹钟
+                    alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
+                    if (alarmTime <= System.currentTimeMillis()) continue
+                } else {
+                    continue
+                }
+            }
+
+            result.add(alarmTime to week)
+        }
+        return result
     }
 
     /**

@@ -1,14 +1,12 @@
 # Schedule 课表
 
-基于 WakeUp 课程表 3.612 魔改重构的 Android 课表应用。
+基于 WakeUp 课程表的Kotlin重构版的 3.612 版本魔改重构的 Android 课表应用。
 
 🌐 [官方网站](https://yngu196.github.io/Schedule/)
 
 ## 声明
 
-本项目是对 [WakeUp课程表](https://github.com/YZune/WakeUpSchedule) 3.612 版本的魔改重构项目。
-
-开源旨在可以降低后来者的门槛，借鉴可以，但是希望在相关 App 中能有所声明。
+本项目是对 [WakeUp课程表的Kotlin重构版]的3.612 版本的魔改重构项目。
 
 教务网页解析的部分使用了 [CourseAdapter](https://github.com/YZune/CourseAdapter) 库。
 
@@ -96,6 +94,28 @@ app/src/main/
 
 ## 更新日志
 
+### v1.7.5
+
+**修复下课倒计时出现负数**
+
+- 修复最小化小组件安全更新闹钟调度在倒计时归零后(＋1s)才触发的问题，改为归零时触发，结合 Doze 模式延迟也不再显示负数
+- 文本模式(<60s) / Chronometer 模式(≥60s) / 低版本保底模式的安全更新全部改为在 `remainingMillis` 归零时触发
+
+**修复课前通知无法按时触发**
+
+- 修复 `setAlarmClock` 全局只能存在 1 个的问题：多课程注册时后者覆盖前者，导致仅最后一门课程享受高优先级
+- 现在改为两轮注册制：先收集所有有效闹钟找出全局最近的一个，仅其使用 `setAlarmClock`，其余全部使用 `setExactAndAllowWhileIdle`
+- 新增 `SkipSetAlarmClockException` 控制异常用于内部降级跳转
+
+**修复下课后小组件不立即更新**
+
+- 课程结束闹钟从相对延迟(`now + delay`)改为绝对时间调度(基于课程实际下课时刻)，确保无论何时调用都锚定真实下课时间
+
+**版本号**
+
+- `versionCode`: 1505 → 1506
+- `versionName`: 1.7.4 → 1.7.5
+
 ### v1.7.4
 
 **修复 Chronometer 长时间显示负数倒计时**
@@ -117,7 +137,7 @@ app/src/main/
 
 **更新对话框新增 GitCode 下载源**
 
-- 在 [dialog_update.xml](file:///d:/CherryProject/Schedule/app/src/main/res/layout/dialog_update.xml) 中新增「GitCode 下载 (国内推荐)」按钮
+- 在 [dialog\_update.xml](file:///d:/CherryProject/Schedule/app/src/main/res/layout/dialog_update.xml) 中新增「GitCode 下载 (国内推荐)」按钮
 - [UpdateService](file:///d:/CherryProject/Schedule/app/src/main/java/com/cherry/wakeupschedule/service/UpdateService.kt) 新增 `GITCODE_URL` 常量：`https://gitcode.com/2401_87059416/Schedule/releases/`
 - 蓝奏云按钮降级为「蓝奏云下载」，把国内推荐位让给 GitCode
 
@@ -184,7 +204,7 @@ app/src/main/
 
 **课前通知稳定性修复**
 
-- 移除了 `notificationManager.cancelAll()，避免正在显示的课程通知被误杀
+- 移除了 \`notificationManager.cancelAll()，避免正在显示的课程通知被误杀
 - 优化了课程通知的显示稳定性
 
 **节假日管理优化**
@@ -242,9 +262,8 @@ app/src/main/
 - 修复了真机实测发现的两个严重问题：
 
 1. 通知延迟问题（上课十多分钟才弹通知
-   - 重写闹钟时间计算逻辑，从 Calendar.set(DAY_OF_WEEK) 改为基于学期开始日期的精确计算
+   - 重写闹钟时间计算逻辑，从 Calendar.set(DAY\_OF\_WEEK) 改为基于学期开始日期的精确计算
    - 新增 calculateAlarmTimeMillis() 函数，避免 Calendar 解析不确定性
-
 2. 同课程出现两个通知
    - 新增时间窗口去重机制，5秒内同一课程不重复弹通知
    - 使用更精确的通知ID生成方式
