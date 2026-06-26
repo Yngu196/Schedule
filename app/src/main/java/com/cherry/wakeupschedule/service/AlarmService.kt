@@ -99,8 +99,17 @@ class AlarmService(private val context: Context) {
             return
         }
 
-        // 如果设置的时间已过，则改为下周
+        // 如果设置的时间已过，先检查是否需要补救（课程尚未开始），再推送到下周
         if (alarmTime <= System.currentTimeMillis()) {
+            val courseStartTime = calculateAlarmTimeMillis(course, currentWeek, 0)
+            if (courseStartTime > 0L && System.currentTimeMillis() < courseStartTime) {
+                Log.w("AlarmService", "setCourseAlarm 补救：闹钟时间已过但课程尚未开始，通过 WorkManager 立即通知")
+                try {
+                    ExactAlarmWorker.scheduleImmediate(context, course)
+                } catch (e: Exception) {
+                    Log.e("AlarmService", "setCourseAlarm 补救调度失败", e)
+                }
+            }
             alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
         }
 
@@ -181,7 +190,11 @@ class AlarmService(private val context: Context) {
         // 同时取消WorkManager的提醒
         ExactAlarmWorker.cancelReminder(context, course.id)
         // 同时清理通知栏中已展示的该课程通知，避免删除/修改后旧通知残留
-        notificationHelper.cancelCourseNotifications(course.name)
+        // 使用统一通知ID公式：cancelCourseNotifications 内部已覆盖
+        // 无周次 (courseId.toInt()) 和每周 (courseId*100+week)
+        notificationHelper.cancelCourseNotifications(course.id, course.name)
+        // 释放该课程占用的所有闹钟槽位
+        AlarmSlotManager.getInstance(context).freeAllSlotsForCourse(course.id)
         Log.d("AlarmService", "Cancelled alarm for ${course.name}")
     }
 
@@ -198,8 +211,8 @@ class AlarmService(private val context: Context) {
             return
         }
 
-        // 先取消旧提醒
-        cancelCourseAlarm(course)
+        // ★ 关键：不再调用 cancelCourseAlarm(course)，避免破坏 registerAllCourseNotifications()
+        // 已注册的 AlarmManager 全学期闹钟。此处仅叠加一个 WorkManager 作为额外兜底。
 
         val currentWeek = getCurrentWeek()
 
@@ -210,8 +223,17 @@ class AlarmService(private val context: Context) {
         // 使用学期开始日期精确计算闹钟时间
         var alarmTime = calculateAlarmTimeMillis(course, currentWeek, course.alarmMinutesBefore)
 
-        // 如果时间已过，则安排到下周
+        // 如果时间已过，先检查是否需要补救（课程尚未开始），再推送到下周
         if (alarmTime <= System.currentTimeMillis()) {
+            val courseStartTime = calculateAlarmTimeMillis(course, currentWeek, 0)
+            if (courseStartTime > 0L && System.currentTimeMillis() < courseStartTime) {
+                Log.w("AlarmService", "scheduleExactReminder 补救：闹钟时间已过但课程尚未开始，通过 WorkManager 立即通知")
+                try {
+                    ExactAlarmWorker.scheduleImmediate(context, course)
+                } catch (e: Exception) {
+                    Log.e("AlarmService", "scheduleExactReminder 补救调度失败", e)
+                }
+            }
             alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
         }
 
@@ -221,7 +243,7 @@ class AlarmService(private val context: Context) {
         val delayMillis = alarmTime - System.currentTimeMillis()
         val delayMinutes = (delayMillis / (1000 * 60)).coerceAtLeast(1)
 
-        // 使用WorkManager安排提醒
+        // 使用WorkManager安排提醒（叠加式，不取消已有闹钟）
         ExactAlarmWorker.scheduleReminder(context, course, delayMinutes)
         Log.d("AlarmService", "Scheduled WorkManager reminder for ${course.name} in $delayMinutes minutes")
     }
@@ -386,6 +408,10 @@ class AlarmService(private val context: Context) {
     /**
      * 注册所有课程的通知
      * 为整个学期的每周课程安排闹钟
+     *
+     * 关键：不再无条件 cancel + re-register，避免在闹钟即将触发的时间窗口内
+     * 把本周闹钟推向下一周导致课前通知丢失。
+     * 仅在课程数据发生变更时才完全重建；定期兜底刷新使用增量合并策略。
      */
     fun registerAllCourseNotifications() {
         // 启动每日多时段刷新闹钟（防止 vivo/OPPO 杀进程后闹钟丢失）
@@ -396,11 +422,6 @@ class AlarmService(private val context: Context) {
 
         val allCourses = CourseDataManager.getInstance(context).getAllCourses()
         val semesterEndWeek = allCourses.maxOfOrNull { it.endWeek } ?: 20
-
-        // 先取消所有课程的旧闹钟，避免作息表变更后旧闹钟与新学期时间冲突
-        allCourses.forEach { course ->
-            cancelCourseAlarm(course)
-        }
 
         // 为每门课程的每周安排通知
         allCourses.forEach { course ->
@@ -443,20 +464,25 @@ class AlarmService(private val context: Context) {
                 }
             }
 
-            // 如果时间已过且是当前周，改为下周
+            // 如果时间已过且是当前周，尝试补救而非直接推到下周
             if (alarmTime <= System.currentTimeMillis()) {
                 if (week == currentWeek) {
-                    alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
-                    if (alarmTime <= System.currentTimeMillis()) continue
-
-                    // 检查下周的日期是否是节假日
-                    if (settingsManager.isHideHolidayCourses()) {
-                        val calendar = Calendar.getInstance().apply { timeInMillis = alarmTime }
-                        if (holidayManager.isHoliday(calendar)) {
-                            Log.d("AlarmService", "Skipping alarm for ${course.name} next week because it's a holiday")
-                            continue
+                    // 检查是否在可补救窗口内：闹钟预期触发时间 + 课程时长 范围内
+                    // 例如上课前30分钟闹钟本应在9:30触发，课程10:00开始，现在9:45刷新
+                    // 如果上课还没开始，通过 WorkManager 立即补救通知
+                    val courseStartTime = calculateAlarmTimeMillis(course, week, 0)
+                    if (courseStartTime > 0L && System.currentTimeMillis() < courseStartTime) {
+                        Log.w("AlarmService", "补救本周 ${course.name} Week$week 的闹钟：闹钟时间已过但课程尚未开始，通过 WorkManager 立即通知")
+                        try {
+                            // 使用独立 workName="course_catchup_{id}"，不会被后续标准备份（REPLACE）覆盖
+                            ExactAlarmWorker.scheduleImmediate(context, course)
+                        } catch (e: Exception) {
+                            Log.e("AlarmService", "补救 WorkManager 调度失败", e)
                         }
                     }
+                    // 同时为下周安排闹钟
+                    alarmTime = calculateAlarmTimeMillis(course, currentWeek + 1, course.alarmMinutesBefore)
+                    if (alarmTime <= System.currentTimeMillis()) continue
                 } else {
                     continue
                 }
@@ -471,8 +497,8 @@ class AlarmService(private val context: Context) {
                 putExtra("notification_week", week)
             }
 
-            // 使用课程ID和周数生成唯一的通知ID
-            val notificationId = (course.id * 100 + week).toInt()
+            // 使用课程ID和周数生成唯一的通知ID（统一公式）
+            val notificationId = NotificationHelper.generateNotificationId(course.id, week)
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 notificationId,
@@ -483,6 +509,30 @@ class AlarmService(private val context: Context) {
             // 使用多重兜底设置闹钟，国产 ROM 也能尽量保证触发
             scheduleAlarmWithFallback(alarmTime, pendingIntent, "${course.name}#w${week}")
             Log.d("AlarmService", "Registered alarm for ${course.name} week $week at ${java.util.Date(alarmTime)}")
+
+            // 分配到闹钟槽位，追踪活跃状态
+            val slotId = AlarmSlotManager.getInstance(context).allocateSlot(
+                courseId = course.id,
+                courseName = course.name,
+                week = week,
+                alarmTimeMillis = alarmTime
+            )
+            if (slotId >= 0) {
+                Log.d("AlarmService", "槽位 $slotId 已分配: ${course.name} week=$week")
+            }
+
+            // 仅对当前周和下一周的闹钟设置 WorkManager 备份（比 AlarmManager 晚 1 分钟触发）
+            // 不对更远的周次做备份，避免 WorkManager 任务数量爆炸（20周×N门课会超出系统限制）
+            if (week == currentWeek || week == currentWeek + 1) {
+                val backupAlarmTime = alarmTime + 60 * 1000L
+                val backupDelayMinutes = ((backupAlarmTime - System.currentTimeMillis()) / (1000 * 60)).coerceAtLeast(1)
+                try {
+                    ExactAlarmWorker.scheduleReminder(context, course, backupDelayMinutes)
+                    Log.d("AlarmService", "WorkManager 备份已调度: ${course.name} week $week, 延迟${backupDelayMinutes}分钟")
+                } catch (e: Exception) {
+                    Log.w("AlarmService", "WorkManager 备份调度失败: ${course.name} week $week", e)
+                }
+            }
 
             // 设置自动启动闹钟（在课前通知前1分钟自动启动应用）
             val autoStartTime = alarmTime - 60 * 1000L
@@ -692,9 +742,13 @@ class AlarmReceiver : BroadcastReceiver() {
                 it.getSerializableExtra("course") as? Course
             }
 
-            // 使用课程名+周次生成更精确的通知ID，先取消避免堆积
+            // 使用课程ID+周次生成统一通知ID
             val week = it.getIntExtra("notification_week", 0)
-            val uniqueId = if (week > 0) "$courseName#$week".hashCode() else courseName.hashCode()
+            val uniqueId = if (week > 0) {
+                NotificationHelper.generateNotificationId(course?.id ?: 0, week)
+            } else {
+                NotificationHelper.generateNotificationId(course?.id ?: 0, 0)
+            }
             notificationHelper.cancelNotification(uniqueId)
 
             // 构建并显示通知
@@ -711,11 +765,22 @@ class AlarmReceiver : BroadcastReceiver() {
 
             // 为下一周安排闹钟（持续性提醒）+ 同时刷新所有课程闹钟，
             // 避免周期应用被杀后下节课闹钟被清除
+            // 重要：先校验 course 是否仍然存在于数据库中，防止已删除课程的幽灵闹钟
             if (course != null) {
-                CoroutineScope(Dispatchers.IO).launch {
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
                     try {
-                        AlarmService(ctx).setCourseAlarm(course)
-                        AlarmService(ctx).registerAllCourseNotifications()
+                        // 检查课程是否仍然存在于数据库中
+                        val allCourses = CourseDataManager.getInstance(ctx).getAllCourses()
+                        val stillExists = allCourses.any { it.id == course.id }
+                        if (stillExists) {
+                            AlarmService(ctx).setCourseAlarm(course)
+                            AlarmService(ctx).registerAllCourseNotifications()
+                        } else {
+                            Log.w(TAG, "课程 ${course.name} (id=${course.id}) 已不存在，跳过闹钟重注册")
+                            // 清理可能残留的通知和闹钟
+                            NotificationHelper(ctx).cancelCourseNotifications(course.id, course.name)
+                            AlarmSlotManager.getInstance(ctx).freeAllSlotsForCourse(course.id)
+                        }
                     } catch (e: Exception) {
                         Log.e(TAG, "重新注册闹钟失败", e)
                     }
@@ -743,8 +808,8 @@ class BootCompletedReceiver : BroadcastReceiver() {
         // 只处理开机完成广播
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
 
-        // 在IO线程中恢复闹钟
-        CoroutineScope(Dispatchers.IO).launch {
+        // 在IO线程中恢复闹钟（使用 GlobalScope 避免 BroadcastReceiver 销毁时协程被取消）
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             try {
                 // 如果闹钟启用，则恢复所有闹钟并设置每日刷新
                 if (SettingsManager(context).isAlarmEnabled()) {
@@ -771,7 +836,7 @@ class DailyAlarmReceiver : BroadcastReceiver() {
         val refreshHour = intent.getIntExtra("refresh_hour", 4)
         val refreshRequestCode = intent.getIntExtra("refresh_request_code", 99990)
 
-        CoroutineScope(Dispatchers.IO).launch {
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             try {
                 val settingsManager = SettingsManager(context)
                 if (settingsManager.isAlarmEnabled()) {

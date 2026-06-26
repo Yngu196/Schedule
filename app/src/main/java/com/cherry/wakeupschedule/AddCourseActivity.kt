@@ -276,8 +276,8 @@ class AddCourseActivity : AppCompatActivity() {
             viewModel.addCourse(course)
             Toast.makeText(this, "课程添加成功", Toast.LENGTH_SHORT).show()
         }
-        // 重新注册所有课程闹钟：编辑时需取消旧的周次闹钟，新增时需建立完整的周次提醒链
-        App.instance.registerAllCourseNotifications()
+        // updateCourse / addCourse 已在 ViewModel 内部同步调用 registerAllCourseNotifications，
+        // 此处不再重复调用，避免 DB 写入竞态导致新课程遗漏
         ScheduleWidgetUpdateService.triggerUpdate(this)
         finish()
     }

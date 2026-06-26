@@ -52,7 +52,7 @@ class AutoStartReceiver : BroadcastReceiver() {
         val courseName = intent?.getStringExtra(EXTRA_COURSE_NAME) ?: ""
         Log.d("AutoStartReceiver", "Auto-starting app in background for course: $courseName")
 
-        CoroutineScope(Dispatchers.IO).launch {
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             try {
                 if (SettingsManager(context).isAlarmEnabled()) {
                     AlarmService(context).registerAllCourseNotifications()

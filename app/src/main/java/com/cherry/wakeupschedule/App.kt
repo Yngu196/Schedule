@@ -23,8 +23,11 @@ class App : Application() {
 
     var alarmService: AlarmService? = null
     private var timeTickReceiver: BroadcastReceiver? = null
+    private var screenStateReceiver: BroadcastReceiver? = null
     private val secondTickHandler = Handler(Looper.getMainLooper())
     private var secondTickRunnable: Runnable? = null
+    @Volatile
+    private var isScreenOn = true
 
     override fun onCreate() {
         super.onCreate()
@@ -70,6 +73,12 @@ class App : Application() {
         }
 
         try {
+            registerScreenStateReceiver()
+        } catch (e: Exception) {
+            android.util.Log.e("App", "Failed to register screen state receiver", e)
+        }
+
+        try {
             startSecondTick()
             Log.d("App", "Per-second widget tick started")
         } catch (e: Exception) {
@@ -95,10 +104,37 @@ class App : Application() {
         Log.d("App", "TIME_TICK receiver registered dynamically for per-minute widget updates")
     }
 
+    private fun registerScreenStateReceiver() {
+        screenStateReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    Intent.ACTION_SCREEN_OFF -> {
+                        isScreenOn = false
+                        stopSecondTick()
+                        Log.d("App", "Screen off — widget tick paused")
+                    }
+                    Intent.ACTION_SCREEN_ON -> {
+                        isScreenOn = true
+                        startSecondTick()
+                        Log.d("App", "Screen on — widget tick resumed")
+                    }
+                }
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+        }
+        registerReceiver(screenStateReceiver, filter, RECEIVER_NOT_EXPORTED)
+        Log.d("App", "Screen state receiver registered")
+    }
+
     private fun startSecondTick() {
+        if (!isScreenOn) return
         stopSecondTick()
         secondTickRunnable = object : Runnable {
             override fun run() {
+                if (!isScreenOn) return
                 MinimalWidgetProvider.triggerUpdate(this@App)
                 ScheduleWidgetProvider.triggerUpdate(this@App)
                 secondTickHandler.postDelayed(this, 1000L)

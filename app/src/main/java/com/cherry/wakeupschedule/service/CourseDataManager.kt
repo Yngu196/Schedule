@@ -44,9 +44,14 @@ class CourseDataManager private constructor(context: Context) {
         }
     }
 
-    private fun saveCoursesToPrefs(courses: List<Course>) {
+    private fun saveCoursesToPrefs(courses: List<Course>, synchronous: Boolean = false) {
         val coursesJson = gson.toJson(courses)
-        prefs.edit().putString(KEY_COURSES, coursesJson).apply()
+        val editor = prefs.edit().putString(KEY_COURSES, coursesJson)
+        if (synchronous) {
+            editor.commit()
+        } else {
+            editor.apply()
+        }
     }
 
     /**
@@ -157,7 +162,7 @@ class CourseDataManager private constructor(context: Context) {
     }
 
     /**
-     * 更新课程
+     * 更新课程（同步写入，避免进程被杀时数据丢失）
      */
     @Synchronized
     fun updateCourse(course: Course) {
@@ -166,19 +171,19 @@ class CourseDataManager private constructor(context: Context) {
         if (index != -1) {
             currentCourses[index] = course
             _coursesFlow.value = currentCourses
-            saveCoursesToPrefs(currentCourses)
+            saveCoursesToPrefs(currentCourses, synchronous = true)
         }
     }
 
     /**
-     * 删除课程
+     * 删除课程（同步写入，避免进程被杀时数据丢失）
      */
     @Synchronized
     fun deleteCourse(course: Course) {
         val currentCourses = _coursesFlow.value.toMutableList()
         currentCourses.removeAll { it.id == course.id }
         _coursesFlow.value = currentCourses
-        saveCoursesToPrefs(currentCourses)
+        saveCoursesToPrefs(currentCourses, synchronous = true)
     }
 
     /**
@@ -187,7 +192,7 @@ class CourseDataManager private constructor(context: Context) {
     fun clearAllCourses() {
         synchronized(this) {
             _coursesFlow.value = emptyList()
-            saveCoursesToPrefs(emptyList())
+            saveCoursesToPrefs(emptyList(), synchronous = true)
         }
     }
 

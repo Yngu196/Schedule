@@ -13,7 +13,9 @@ import com.cherry.wakeupschedule.service.SettingsManager
 import com.cherry.wakeupschedule.service.HolidayManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 /**
@@ -130,17 +132,29 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     // 添加课程
     fun addCourse(course: Course) {
         viewModelScope.launch {
-            courseDataManager.addCourse(course)
-            alarmService?.setCourseAlarm(course)
+            val newCourse = courseDataManager.addCourse(course)  // addCourse 返回带正确 ID 的 Course
+            alarmService?.setCourseAlarm(newCourse)
+            // 确保全学期闹钟矩阵注册在 DB 写入完成后执行，避免 AddCourseActivity
+            // 中的 GlobalScope 协程在 DB 写入完成前就开始注册闹钟导致新课程遗漏
+            withContext(Dispatchers.IO) {
+                App.instance.registerAllCourseNotifications()
+            }
         }
     }
 
     // 批量添加课程
     fun addCourses(courses: List<Course>) {
         viewModelScope.launch {
+            // addCourses 内部生成 ID，需先传给 DataManager，再读取回来以获取正确 ID
+            val beforeAdd = courseDataManager.getAllCourses()
             courseDataManager.addCourses(courses)
-            courses.forEach { course ->
+            val afterAdd = courseDataManager.getAllCourses()
+            val addedCourses = afterAdd.filter { after -> beforeAdd.none { it.id == after.id } }
+            addedCourses.forEach { course ->
                 alarmService?.setCourseAlarm(course)
+            }
+            withContext(Dispatchers.IO) {
+                App.instance.registerAllCourseNotifications()
             }
         }
     }
@@ -150,6 +164,9 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             courseDataManager.updateCourse(course)
             alarmService?.setCourseAlarm(course)
+            withContext(Dispatchers.IO) {
+                App.instance.registerAllCourseNotifications()
+            }
         }
     }
 

@@ -24,15 +24,65 @@ class ImportService(private val context: Context) {
         try {
             var fileName = getFileName(uri) ?: uri.path?.let { java.io.File(it).name }
             Log.d("ImportService", "开始导入文件: $fileName")
-            when {
+            val result = when {
+                fileName?.endsWith(".json") == true -> importFromJsonFile(uri)
                 fileName?.endsWith(".xls") == true || fileName?.endsWith(".xlsx") == true -> importFromExcel(uri)
                 fileName?.endsWith(".csv") == true -> importFromCsvFile(uri)
                 else -> tryImportByContent(uri)
             }
+            result
         } catch (e: Exception) {
             Log.e("ImportService", "导入失败", e)
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "导入失败: ${e.message}\n请检查文件格式", Toast.LENGTH_LONG).show()
+            }
+            false
+        }
+    }
+
+    /**
+     * 从 JSON 文件导入（支持版本化协议）
+     */
+    private suspend fun importFromJsonFile(uri: Uri): Boolean = withContext(Dispatchers.IO) {
+        try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                val json = inputStream.bufferedReader().readText()
+                val package_ = ImportCourseProtocol.parse(json) ?: return@withContext false
+
+                val courses = package_.courses.mapIndexed { index, model ->
+                    with(ImportCourseProtocol) { model.toCourse(baseId = 0) } // ID 由 CourseDataManager 分配
+                }
+
+                if (courses.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "JSON 文件中未找到有效课程数据", Toast.LENGTH_LONG).show()
+                    }
+                    return@withContext false
+                }
+
+                // 校验导入的课程数据
+                val validationResult = CourseValidator.validateBatch(courses)
+                val errors = validationResult.values.flatten().filter {
+                    it is CourseValidator.ValidationResult.Error
+                }
+                if (errors.isNotEmpty()) {
+                    Log.w("ImportService", "课程数据校验发现 ${errors.size} 个错误")
+                    errors.take(5).forEach { Log.w("ImportService", "校验错误: ${(it as CourseValidator.ValidationResult.Error).message}") }
+                }
+
+                val merged = mergeCourses(courses)
+                courseDataManager.addCourses(merged)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "成功导入 ${merged.size} 门课程", Toast.LENGTH_SHORT).show()
+                }
+                Log.d("ImportService", "JSON 导入成功: ${merged.size} 门课程 (schema_version=${package_.schemaVersion})")
+                return@withContext true
+            }
+            false
+        } catch (e: Exception) {
+            Log.e("ImportService", "JSON 导入失败", e)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "JSON 导入失败: ${e.message}", Toast.LENGTH_LONG).show()
             }
             false
         }
@@ -177,7 +227,7 @@ class ImportService(private val context: Context) {
             val endTime = getCellValue(row.getCell(5)).toIntOrNull() ?: return null
             val startWeek = getCellValue(row.getCell(6)).toIntOrNull() ?: return null
             val endWeek = if (row.lastCellNum > 7) getCellValue(row.getCell(7)).toIntOrNull() ?: startWeek else startWeek
-            if (dayOfWeek !in 1..7 || startTime !in 1..12 || endTime !in 1..12 || startWeek !in 1..20 || endWeek !in 1..20) return null
+            if (dayOfWeek !in 1..7 || startTime !in 1..14 || endTime !in 1..14 || startWeek !in 1..25 || endWeek !in 1..25) return null
             Course(
                 name = courseName,
                 teacher = getCellValue(row.getCell(1)),
@@ -206,6 +256,7 @@ class ImportService(private val context: Context) {
             var endTime = 2
             var startWeek = 1
             var endWeek = 16
+            var weekType = 0  // 0=每周, 1=单周, 2=双周
 
             for (i in 0 until row.lastCellNum) {
                 val v = getCellValue(row.getCell(i))
@@ -233,6 +284,15 @@ class ImportService(private val context: Context) {
                     startWeek = it.groupValues[1].toInt()
                     endWeek = it.groupValues[2].toInt()
                 }
+                // 检测单双周标记
+                if (v.contains("单周") && !v.contains("双周")) weekType = 1
+                else if (v.contains("双周")) weekType = 2
+                // "每周" / "全周" / 无标记 → weekType 保持 0
+            }
+            // 如果检测到单/双周但没有显式周范围，尝试从文本推断
+            if (weekType != 0 && startWeek == 1 && endWeek == 16) {
+                // 有单/双周标记但周范围是默认值，说明教务系统中单/双周通常是 1-16/1-15
+                endWeek = if (weekType == 1) 15 else 16
             }
             if (courseName.isBlank()) return null
             Course(
@@ -243,7 +303,8 @@ class ImportService(private val context: Context) {
                 startTime = startTime,
                 endTime = endTime,
                 startWeek = startWeek,
-                endWeek = endWeek
+                endWeek = endWeek,
+                weekType = weekType
             )
         } catch (e: Exception) {
             Log.e("ImportService", "解析教务系统Excel行失败", e)
@@ -431,7 +492,7 @@ class ImportService(private val context: Context) {
             val endTime = parts[5].trim().toIntOrNull() ?: return null
             val startWeek = parts[6].trim().toIntOrNull() ?: return null
             val endWeek = if (parts.size > 7) parts[7].trim().toIntOrNull() ?: startWeek else startWeek
-            if (dayOfWeek !in 1..7 || startTime !in 1..12 || endTime !in 1..12 || startWeek !in 1..20 || endWeek !in 1..20) return null
+            if (dayOfWeek !in 1..7 || startTime !in 1..14 || endTime !in 1..14 || startWeek !in 1..25 || endWeek !in 1..25) return null
             Course(
                 name = courseName,
                 teacher = parts[1].trim(),
@@ -455,42 +516,57 @@ class ImportService(private val context: Context) {
 
     // 合并相同课程
     private fun mergeCourses(courses: List<Course>): List<Course> {
-        // 按完整的课程信息分组：课程名+老师+教室+星期+开始节次+结束节次
-        // 这样确保不同老师或不同课程的相同时间段不会被错误合并
-        val groups = courses.groupBy { "${it.name}-${it.teacher}-${it.classroom}-${it.dayOfWeek}-${it.startTime}-${it.endTime}" }
+        // ★ 关键修复：分组键必须包含 weekType，防止单双周课程被错误合并
+        // 例如：高等数学(单周) 和 高等数学(双周) 是两个独立课程，不应合并
+        val groups = courses.groupBy {
+            "${it.name}-${it.teacher}-${it.classroom}-${it.dayOfWeek}-${it.startTime}-${it.endTime}-${it.weekType}"
+        }
         return groups.map { (_, group) ->
             val sortedGroup = group.sortedBy { it.startWeek }
             val result = mutableListOf<Course>()
-            
-            // 尝试合并连续或重叠的周范围
+
+            // 尝试合并连续或重叠的周范围（同一 weekType 组内）
             if (sortedGroup.isNotEmpty()) {
                 var current = sortedGroup[0]
                 for (i in 1 until sortedGroup.size) {
                     val next = sortedGroup[i]
                     // 如果周范围连续或重叠，则合并
                     if (next.startWeek <= current.endWeek + 1) {
-                        // 合并：取最小的开始周和最大的结束周
                         val newStartWeek = minOf(current.startWeek, next.startWeek)
                         val newEndWeek = maxOf(current.endWeek, next.endWeek)
                         current = current.copy(startWeek = newStartWeek, endWeek = newEndWeek)
                     } else {
-                        // 不连续，保存当前的，开始新的
                         result.add(current)
                         current = next
                     }
                 }
                 result.add(current)
             }
-            
-            // 对于合并后的课程，重新计算 weekType
+
+            // 重新校验合并后的 weekType 是否与分组时的 weekType 一致
+            // 合并范围扩大后可能引入异周次，需要修正
             val resultWithWeekType = result.map { course ->
                 val weekNumbers = (course.startWeek..course.endWeek).toSet()
-                val weekType = when {
+                val computedWeekType = when {
                     weekNumbers.all { w -> w % 2 == 1 } -> 1
                     weekNumbers.all { w -> w % 2 == 0 } -> 2
                     else -> 0
                 }
-                course.copy(weekType = weekType)
+                // 如果计算出的 weekType 与合并前不一致（因范围扩大），保留原始 weekType
+                // 而非错误地降级为 0（每周）
+                val finalWeekType = if (computedWeekType == 0 && group.isNotEmpty()) {
+                    val originalWeekType = group.first().weekType
+                    if (originalWeekType == 1 || originalWeekType == 2) {
+                        // 组内原始 weekType 为单/双周，但合并后范围跨周次
+                        // 保留原始值，由后续通知注册层的 isWeekTypeMatched 做精确过滤
+                        originalWeekType
+                    } else {
+                        computedWeekType
+                    }
+                } else {
+                    computedWeekType
+                }
+                course.copy(weekType = finalWeekType)
             }
             resultWithWeekType
         }.flatten()
@@ -508,21 +584,55 @@ class ImportService(private val context: Context) {
         // 从JSON解析课程列表
         fun parseCoursesFromJson(json: String): List<Course> {
             return try {
+                // 尝试使用版本化协议解析
+                val protocolResult = ImportCourseProtocol.parse(json)
+                if (protocolResult != null) {
+                    Log.d("ImportService", "使用版本化协议解析 JSON (schema_version=${protocolResult.schemaVersion})")
+                    return with(ImportCourseProtocol) {
+                        protocolResult.courses.map { it.toCourse(baseId = 0) }
+                    }
+                }
+                // 回退到旧版兼容解析
+                parseLegacyJson(json)
+            } catch (e: Exception) {
+                Log.e("ImportService", "JSON解析失败，尝试回退", e)
+                try {
+                    parseLegacyJson(json)
+                } catch (e2: Exception) {
+                    Log.e("ImportService", "JSON回退也失败", e2)
+                    emptyList()
+                }
+            }
+        }
+
+        private fun parseLegacyJson(json: String): List<Course> {
+            return try {
                 val courses = mutableListOf<Course>()
                 val jsonArray = org.json.JSONArray(json)
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
+                    // 兼容字符串形式的 weekType (如 "odd"/"even"/"all"/"单"/"双")
+                    val parsedWeekType = when (val raw = obj.opt("weekType")) {
+                        is String -> when (raw.lowercase()) {
+                            "odd", "单", "单周", "1" -> 1
+                            "even", "双", "双周", "2" -> 2
+                            "all", "全", "每周", "0" -> 0
+                            else -> raw.toIntOrNull() ?: 0
+                        }
+                        is Number -> raw.toInt().coerceIn(0, 2)
+                        else -> 0
+                    }
                     courses.add(Course(
                         id = obj.optLong("id", 0),
                         name = obj.optString("name", "").takeIf { it.isNotBlank() } ?: continue,
                         teacher = obj.optString("teacher", ""),
                         classroom = obj.optString("classroom", ""),
                         dayOfWeek = obj.optInt("dayOfWeek", 1).coerceIn(1, 7),
-                        startTime = obj.optInt("startTime", 1).coerceIn(1, 12),
-                        endTime = obj.optInt("endTime", 2).coerceIn(1, 12),
-                        startWeek = obj.optInt("startWeek", 1).coerceIn(1, 20),
-                        endWeek = obj.optInt("endWeek", 16).coerceIn(1, 20),
-                        weekType = obj.optInt("weekType", 0).coerceIn(0, 2),
+                        startTime = obj.optInt("startTime", 1).coerceIn(1, 14),
+                        endTime = obj.optInt("endTime", 2).coerceIn(1, 14),
+                        startWeek = obj.optInt("startWeek", 1).coerceIn(1, 25),
+                        endWeek = obj.optInt("endWeek", 16).coerceIn(1, 25),
+                        weekType = parsedWeekType,
                         alarmEnabled = obj.optBoolean("alarmEnabled", true),
                         alarmMinutesBefore = obj.optInt("alarmMinutesBefore", 15),
                         color = obj.optInt("color", 0xFF6200EE.toInt())

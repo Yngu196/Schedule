@@ -5,6 +5,7 @@ import android.os.Build
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -31,9 +32,11 @@ class ExactAlarmWorker(
         private const val TAG = "ExactAlarmWorker"
         private const val KEY_COURSE_JSON = "course_json"
         private const val KEY_COURSE_ID = "course_id"
+        private const val WORK_NAME_PREFIX = "course_exact_reminder"
+        private const val CATCHUP_WORK_NAME_PREFIX = "course_catchup"
 
         /**
-         * 调度课程提醒
+         * 调度课程提醒（标准备份）
          */
         fun scheduleReminder(context: Context, course: Course, delayMinutes: Long) {
             val courseJson = Gson().toJson(course)
@@ -43,22 +46,66 @@ class ExactAlarmWorker(
                 .putLong(KEY_COURSE_ID, course.id)
                 .build()
 
+            val workName = "${WORK_NAME_PREFIX}_${course.id}"
+
             val workRequest = OneTimeWorkRequestBuilder<ExactAlarmWorker>()
                 .setInitialDelay(delayMinutes, TimeUnit.MINUTES)
                 .setInputData(inputData)
                 .addTag("course_reminder_${course.id}")
                 .build()
 
-            WorkManager.getInstance(context).enqueue(workRequest)
+            // 使用 REPLACE 策略确保同一课程的 ExactAlarm 备份只有一个待执行任务
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                workName,
+                ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
             Log.d(TAG, "已调度课程 ${course.name} 的精确提醒，延迟 ${delayMinutes} 分钟")
         }
 
         /**
-         * 取消课程提醒
+         * 调度立即补救提醒（独立 workName，不与标准备份互相覆盖）
+         *
+         * 关键设计：使用独立的 workName="course_catchup_{id}"，
+         * 避免被 registerCourseNotificationsForSemester 的备份代码
+         * 或 scheduleExactReminder 的 REPLACE 策略覆盖。
+         */
+        fun scheduleImmediate(context: Context, course: Course) {
+            val courseJson = Gson().toJson(course)
+
+            val inputData = Data.Builder()
+                .putString(KEY_COURSE_JSON, courseJson)
+                .putLong(KEY_COURSE_ID, course.id)
+                .build()
+
+            val workName = "${CATCHUP_WORK_NAME_PREFIX}_${course.id}"
+
+            val workRequest = OneTimeWorkRequestBuilder<ExactAlarmWorker>()
+                .setInitialDelay(0, TimeUnit.MINUTES)
+                .setInputData(inputData)
+                .addTag("course_catchup_${course.id}")
+                .build()
+
+            // REPLACE 确保同一课程的补救任务不堆积
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                workName,
+                ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
+            Log.d(TAG, "已调度课程 ${course.name} 的立即补救提醒")
+        }
+
+        /**
+         * 取消课程提醒（同时取消标准备份和补救任务）
          */
         fun cancelReminder(context: Context, courseId: Long) {
+            val workName = "${WORK_NAME_PREFIX}_$courseId"
+            val catchupWorkName = "${CATCHUP_WORK_NAME_PREFIX}_$courseId"
+            WorkManager.getInstance(context).cancelUniqueWork(workName)
+            WorkManager.getInstance(context).cancelUniqueWork(catchupWorkName)
             WorkManager.getInstance(context).cancelAllWorkByTag("course_reminder_$courseId")
-            Log.d(TAG, "已取消课程 ID=$courseId 的精确提醒")
+            WorkManager.getInstance(context).cancelAllWorkByTag("course_catchup_$courseId")
+            Log.d(TAG, "已取消课程 ID=$courseId 的精确提醒（含补救任务）")
         }
     }
 
@@ -82,10 +129,14 @@ class ExactAlarmWorker(
                 teacher = course.teacher,
                 location = course.classroom,
                 minutesBefore = course.alarmMinutesBefore,
-                notificationId = notificationHelper.getNotificationId(course.id)
+                notificationId = NotificationHelper.generateNotificationId(course.id, 0)
             )
 
-            notificationHelper.showNotification(notificationHelper.getNotificationId(course.id), notification, course.name)
+            notificationHelper.showNotification(
+                NotificationHelper.generateNotificationId(course.id, 0),
+                notification,
+                course.name
+            )
 
             if (shouldReschedule(course)) {
                 rescheduleNextWeek(course)

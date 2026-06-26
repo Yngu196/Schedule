@@ -138,7 +138,8 @@ class CourseReminderForegroundService : Service() {
         return try {
             val settingsManager = SettingsManager(this)
             val semesterStart = settingsManager.getSemesterStartDate()
-            if (semesterStart == 0L) return HEARTBEAT_INTERVAL_MS
+            // 未设置学期时降为10分钟省电，不应高频刷新
+            if (semesterStart == 0L) return 10 * 60 * 1000L
 
             val now = System.currentTimeMillis()
             val calendar = java.util.Calendar.getInstance()

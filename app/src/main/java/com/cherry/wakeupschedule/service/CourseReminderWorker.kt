@@ -67,19 +67,15 @@ class CourseReminderWorker(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "开始检查课程提醒...")
+            Log.d(TAG, "开始定期检查课程提醒...")
 
             if (!SettingsManager(applicationContext).isAlarmEnabled()) {
                 Log.d(TAG, "课前提醒已关闭，跳过检查")
                 return@withContext Result.success()
             }
 
-            // 兜底：每次执行都刷新一次闹钟（防止主闹钟被清后无人补）
-            try {
-                alarmService.registerAllCourseNotifications()
-            } catch (e: Exception) {
-                Log.w(TAG, "Worker 兜底刷新闹钟失败", e)
-            }
+            // 清理已过期的闹钟槽位（闹钟时间已过1小时以上的）
+            cleanStaleSlots()
 
             val currentWeek = getCurrentWeek()
             val currentDayOfWeek = getCurrentDayOfWeek()
@@ -108,27 +104,82 @@ class CourseReminderWorker(
                         minutesUntilClass in 0..REPEAT_INTERVAL_MINUTES.toInt() -> {
                             Log.d(TAG, "课程 ${course.name} 将在 ${minutesUntilClass} 分钟后开始，调度精确提醒")
                             alarmService.scheduleExactReminder(course)
-                            // 兜底：直接通过 WorkManager 派发通知
-                            ExactAlarmWorker.scheduleReminder(
-                                applicationContext,
-                                course,
-                                minutesUntilClass.coerceAtLeast(1).toLong()
-                            )
                         }
                         minutesUntilClass > REPEAT_INTERVAL_MINUTES -> {
                             Log.d(TAG, "课程 ${course.name} 还有 ${minutesUntilClass} 分钟，暂时不处理")
                         }
                         else -> {
-                            Log.d(TAG, "课程 ${course.name} 已错过提醒或已开始")
+                            // 已错过提醒时间但课程尚未开始 → 补救
+                            if (currentMinutes < courseStartMinutes) {
+                                Log.w(TAG, "补救：课程 ${course.name} 提醒已错过但尚未上课，立即通知")
+                                ExactAlarmWorker.scheduleImmediate(applicationContext, course)
+                            } else {
+                                Log.d(TAG, "课程 ${course.name} 已开始，跳过")
+                            }
                         }
                     }
                 }
             }
 
+            // 检查是否有课程在未来30分钟内开始，预防性刷新对应课程的闹钟
+            // 避免因系统杀进程导致闹钟丢失
+            refreshUpcomingAlarms(currentWeek, currentDayOfWeek, currentTime)
+
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "检查课程提醒失败", e)
             Result.retry()
+        }
+    }
+
+    /**
+     * 清理已过期的闹钟槽位（触发时间已超过 1 小时的）
+     */
+    private fun cleanStaleSlots() {
+        try {
+            val slotManager = AlarmSlotManager.getInstance(applicationContext)
+            val now = System.currentTimeMillis()
+            val staleThreshold = 60 * 60 * 1000L  // 1 小时
+            slotManager.getActiveSlotDataList().forEach { slot ->
+                if (now - slot.alarmTimeMillis > staleThreshold) {
+                    Log.d(TAG, "清理过期槽位 ${slot.slotId}: ${slot.courseName} week=${slot.week}")
+                    slotManager.freeSlot(slot.slotId)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "清理过期槽位失败", e)
+        }
+    }
+
+    /**
+     * 预防性刷新即将开始的课程闹钟（30分钟内）
+     * 如果闹钟被系统清除，通过 exactReminder 兜底
+     */
+    private fun refreshUpcomingAlarms(currentWeek: Int, currentDayOfWeek: Int, currentTime: Pair<Int, Int>) {
+        val currentMinutes = currentTime.first * 60 + currentTime.second
+        val allCourses = courseDataManager.getAllCourses()
+        val upcomingCourses = allCourses.filter { course ->
+            course.alarmEnabled &&
+            course.dayOfWeek == currentDayOfWeek &&
+            currentWeek in course.startWeek..course.endWeek &&
+            isWeekTypeMatched(course, currentWeek)
+        }
+
+        upcomingCourses.forEach { course ->
+            val timeSlots = timeTableManager.getTimeSlots()
+            val timeSlot = timeSlots.find { it.node == course.startTime }
+            if (timeSlot != null) {
+                val courseStartMinutes = timeSlot.startTime.split(":").let {
+                    it[0].toInt() * 60 + it[1].toInt()
+                }
+                val minutesUntilAlarm = courseStartMinutes - course.alarmMinutesBefore - currentMinutes
+                if (minutesUntilAlarm in 1..30) {
+                    // 在闹钟窗口内，确保有 WorkManager 兜底
+                    val delayMinutes = minutesUntilAlarm.coerceAtLeast(1).toLong()
+                    ExactAlarmWorker.scheduleReminder(applicationContext, course, delayMinutes)
+                    Log.d(TAG, "预防性刷新: ${course.name} 推迟 ${delayMinutes} 分钟")
+                }
+            }
         }
     }
 
@@ -152,10 +203,11 @@ class CourseReminderWorker(
     }
 
     /**
-     * 获取当前星期几
+     * 获取当前星期几（1=周一, 7=周日，与 Course.dayOfWeek 对齐）
      */
     private fun getCurrentDayOfWeek(): Int {
-        return Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
+        val dayOfWeek = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
+        return if (dayOfWeek == 0) 7 else dayOfWeek
     }
 
     /**

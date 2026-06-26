@@ -1656,6 +1656,7 @@ class MainActivity : AppCompatActivity() {
                     val course2 = course.copy(startWeek = displayWeek + 1)
                     viewModel.addCourse(course1)
                     viewModel.addCourse(course2)
+                    // addCourse 已在 ViewModel 内部调用 registerAllCourseNotifications，此处无需重复
                 }
                 Toast.makeText(this, "已删除本周课程", Toast.LENGTH_SHORT).show()
                 // 更新桌面小组件
